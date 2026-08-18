@@ -1,4 +1,4 @@
-"""The portfolio-directory MCP server. Exposes the 7 tools from the spec over real MCP
+"""The stack-sentinel-directory MCP server. Exposes the 7 tools from the spec over real MCP
 stdio transport, using the official `mcp` Python SDK (installed in .venv, version 2.0.0 —
 its high-level `MCPServer` class is this SDK version's equivalent of the older `FastMCP`).
 
@@ -31,12 +31,12 @@ from mcp_server import tools_impl
 _EXTERNAL_CALLER = {"agent": "mcp-client", "agent_version": "external"}
 
 mcp = MCPServer(
-    name="portfolio-directory",
-    title="Portfolio Pulse — Portfolio Directory",
+    name="stack-sentinel-directory",
+    title="Stack Sentinel — System Directory",
     description=(
-        "Read/write tools over portfolio company theses, loan agreements, financials, the "
-        "longitudinal trend store, and the policy corpus. append_trend_entry is the only "
-        "write tool."
+        "Read/write tools over monitored systems' charters, SLO agreements, layer/operational "
+        "metrics, the longitudinal trend store, and the policy corpus. append_trend_entry is "
+        "the only write tool."
     ),
     version="1.0.0",
 )
@@ -44,27 +44,29 @@ mcp = MCPServer(
 
 @mcp.tool()
 def list_portfolio_companies() -> list[dict[str, Any]]:
-    """List every portfolio company under monitoring, with id, name, relationship_type, sector."""
+    """List every company under monitoring, with id, name, monitoring_track, sector."""
     return tools_impl.list_portfolio_companies(caller=_EXTERNAL_CALLER)
 
 
 @mcp.tool()
-def get_investment_thesis(company_id: str) -> dict[str, Any]:
-    """PE only. The stable investment thesis set at close — semantic memory, not the
-    quarter-by-quarter episodic trend record."""
-    return tools_impl.get_investment_thesis(company_id, caller=_EXTERNAL_CALLER)
+def get_system_charter(company_id: str) -> dict[str, Any]:
+    """CHARTER only. The stable system charter set at launch (target operational metrics +
+    agent_behavior_boundaries + launch risks) — semantic memory, not the cycle-by-cycle
+    episodic trend record."""
+    return tools_impl.get_system_charter(company_id, caller=_EXTERNAL_CALLER)
 
 
 @mcp.tool()
-def get_loan_agreement(company_id: str) -> dict[str, Any]:
-    """PD only. The stable loan agreement / covenant terms set at close."""
-    return tools_impl.get_loan_agreement(company_id, caller=_EXTERNAL_CALLER)
+def get_slo_agreement(company_id: str) -> dict[str, Any]:
+    """SLO only. The stable SLO/error-budget thresholds and reporting cadence set at launch."""
+    return tools_impl.get_slo_agreement(company_id, caller=_EXTERNAL_CALLER)
 
 
 @mcp.tool()
-def get_financials(company_id: str, period: str) -> dict[str, Any]:
-    """Raw reported financials for one company, one quarter (e.g. period="2025-Q2")."""
-    return tools_impl.get_financials(company_id, period, caller=_EXTERNAL_CALLER)
+def get_system_metrics(company_id: str, cycle: str) -> dict[str, Any]:
+    """The full structured snapshot for one company, one cycle (e.g. cycle="2025-S06"):
+    layers (version + change_event per layer), operational_health, and behavior_incidents."""
+    return tools_impl.get_system_metrics(company_id, cycle, caller=_EXTERNAL_CALLER)
 
 
 @mcp.tool()
@@ -77,8 +79,8 @@ def get_trend_history(company_id: str, limit: int | None = None) -> list[dict[st
 
 @mcp.tool()
 def append_trend_entry(entry: dict[str, Any]) -> dict[str, Any]:
-    """The only write tool. Idempotent, keyed by (company_id, quarter) — a duplicate call is
-    a no-op that returns the existing entry, never a new record."""
+    """The only write tool. Idempotent, keyed by (company_id, cycle) — a duplicate call is a
+    no-op that returns the existing entry, never a new record."""
     return tools_impl.append_trend_entry(entry, caller=_EXTERNAL_CALLER)
 
 

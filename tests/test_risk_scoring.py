@@ -40,7 +40,7 @@ def test_version_boundary_alone_is_not_a_risk_finding():
 
 
 def test_policy_violation_routes_to_human_review():
-    finding = risk_scoring.check_policy_violation(True, "missed Credit Committee report")
+    finding = risk_scoring.check_policy_violation(True, "missed RRB report")
     assert finding is not None
     assert finding.routing == "human_review"
     assert finding.risk_tier == "high"
@@ -50,13 +50,28 @@ def test_no_policy_violation_no_finding():
     assert risk_scoring.check_policy_violation(False) is None
 
 
+def test_destructive_change_routes_to_pending_human_approval():
+    finding = risk_scoring.check_destructive_layer_change("destructive_change_candidate", "database", "DROP TABLE raw_events_archive")
+    assert finding is not None
+    assert finding.kind == "destructive_layer_change"
+    assert finding.routing == "pending_human_approval"
+    assert finding.risk_tier == "critical"
+    assert finding.detail["layer"] == "database"
+
+
+def test_routine_change_is_not_a_destructive_finding():
+    assert risk_scoring.check_destructive_layer_change("routine_version_change", "tools") is None
+    assert risk_scoring.check_destructive_layer_change("no_change", "database") is None
+
+
 def test_assess_cycle_returns_all_firing_findings_together():
     findings = risk_scoring.assess_cycle(
         flagged_company_ids=["a", "b"], portfolio_size=3,
         boundary_kind="model_boundary", policy_violation_detected=True, policy_violation_detail="x",
+        destructive_layer_change=("database", "destructive_change_candidate"),
     )
     kinds = sorted(f.kind for f in findings)
-    assert kinds == ["model_boundary_ambiguity", "policy_violation", "systemic_flag_spike"]
+    assert kinds == ["destructive_layer_change", "model_boundary_ambiguity", "policy_violation", "systemic_flag_spike"]
 
 
 def test_assess_cycle_quiet_when_nothing_fires():
@@ -64,46 +79,47 @@ def test_assess_cycle_quiet_when_nothing_fires():
     assert findings == []
 
 
-# --- The specific requirement: a single genuine PD covenant flag across multiple quarters
-# must never trigger a false systemic-flag-spike incident, because PD classification is pure
-# deterministic covenant math with no LLM agent version to regress. This is enforced by
-# orchestrator.run_portfolio_quarter's classifying_agent filter, not by risk_scoring alone
+# --- The specific requirement: a single genuine SLO flag across multiple cycles must never
+# trigger a false systemic-flag-spike incident, because SLO classification is pure
+# deterministic error-budget math with no LLM agent version to regress. This is enforced by
+# orchestrator.run_portfolio_cycle's classifying_agent filter, not by risk_scoring alone
 # (risk_scoring just counts whatever list it's given) — so this test exercises the real
 # orchestrator function end-to-end. ---
 
-def test_pd_only_flag_across_multiple_quarters_never_triggers_spike():
+def test_slo_only_flag_across_multiple_cycles_never_triggers_spike():
     from pulse import orchestrator
 
-    def pd_flagged_result():
+    def slo_flagged_result():
         return {
             "failed": False, "boundary_kind": None, "previous_entry": None,
             "entry": {
-                "classification": "warning", "classifying_agent": "pd-covenant-tracker",
-                "agent_version": "v1", "model": "test-model", "metric_snapshot": {"total_net_leverage": 4.1},
+                "classification": "warning", "classifying_agent": "slo-risk-tracker",
+                "agent_version": "v1", "model": "test-model",
+                "metric_snapshot": {"operational_health": {"monthly_error_budget_consumed_pct": 85}},
             },
         }
 
-    def pe_healthy_result(cid):
+    def charter_healthy_result(cid):
         return {
             "failed": False, "boundary_kind": None, "previous_entry": None,
             "entry": {
-                "classification": "on_thesis", "classifying_agent": "trend-synthesizer",
+                "classification": "on_charter", "classifying_agent": "change-impact-synthesizer",
                 "agent_version": "v2", "model": "test-model", "metric_snapshot": {},
             },
         }
 
-    for quarter in ["2026-Q2", "2026-Q3", "2026-Q4"]:
+    for cycle in ["2025-S06", "2025-S07", "2025-S08"]:
         company_cycle_results = {
-            "northwind": pe_healthy_result("northwind"),
-            "solace": pe_healthy_result("solace"),
-            "ferrous_point": pd_flagged_result(),
+            "meridian": charter_healthy_result("meridian"),
+            "wayfinder": charter_healthy_result("wayfinder"),
+            "cascade": slo_flagged_result(),
         }
-        result = orchestrator.run_portfolio_quarter(
-            quarter=quarter, as_of_date=orchestrator.quarter_end_date(quarter), portfolio_size=3,
+        result = orchestrator.run_portfolio_cycle(
+            cycle=cycle, as_of_date=orchestrator.cycle_end_date(cycle), portfolio_size=3,
             company_cycle_results=company_cycle_results,
         )
         assert result["incidents"] == [], (
-            f"a real, single-company PD covenant flag in {quarter} must never produce a "
+            f"a real, single-company SLO flag in {cycle} must never produce a "
             f"systemic_flag_spike incident, but got: {result['incidents']}"
         )
-        assert result["flagged_company_ids"] == ["ferrous_point"]
+        assert result["flagged_company_ids"] == ["cascade"]

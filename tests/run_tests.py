@@ -15,7 +15,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from pulse import incidents, model_boundary, orchestrator, policy_rules, risk_scoring, trend_store
+from pulse import (
+    audit_log,
+    benchmarks,
+    human_approval,
+    incidents,
+    layer_versioning,
+    metrics,
+    model_boundary,
+    orchestrator,
+    policy_rules,
+    risk_scoring,
+    trend_store,
+)
 
 
 @contextmanager
@@ -46,10 +58,18 @@ def isolated_incidents():
             yield incidents
 
 
+@contextmanager
+def isolated_audit_log():
+    with tempfile.TemporaryDirectory() as tmp:
+        log_path = Path(tmp) / "audit_log.jsonl"
+        with patched(audit_log, "AUDIT_LOG_PATH", log_path), patched(audit_log, "ensure_data_dirs", lambda: None):
+            yield audit_log
+
+
 BASE_ENTRY = {
-    "company_id": "acme", "quarter": "2025-Q1", "relationship_type": "PE",
-    "classifying_agent": "trend-synthesizer", "agent_version": "v1", "model": "test-model",
-    "metric_snapshot": {"x": 1}, "classification": "on_thesis", "rationale": "test",
+    "company_id": "acme", "cycle": "2025-S01", "monitoring_track": "CHARTER",
+    "classifying_agent": "change-impact-synthesizer", "agent_version": "v1", "model": "test-model",
+    "metric_snapshot": {"x": 1}, "classification": "on_charter", "rationale": "test",
 }
 
 
@@ -72,7 +92,7 @@ def _t1():
         ts.append_trend_entry(BASE_ENTRY)
         history = ts.get_trend_history("acme")
         assert len(history) == 1
-        assert history[0]["classification"] == "on_thesis"
+        assert history[0]["classification"] == "on_charter"
 
 
 @test("trend_store: duplicate append does not create a second record (IDEMPOTENCY)")
@@ -90,11 +110,11 @@ def _t3():
     with isolated_trend_store() as ts:
         ts.append_trend_entry(BASE_ENTRY)
         changed = dict(BASE_ENTRY)
-        changed["classification"] = "off_thesis"
+        changed["classification"] = "drifted"
         ts.append_trend_entry(changed)
         history = ts.get_trend_history("acme")
         assert len(history) == 1
-        assert history[0]["classification"] == "on_thesis"
+        assert history[0]["classification"] == "on_charter"
 
 
 @test("trend_store: get_trend_history limit returns most recent")
@@ -102,10 +122,10 @@ def _t4():
     with isolated_trend_store() as ts:
         for i in range(1, 5):
             entry = dict(BASE_ENTRY)
-            entry["quarter"] = f"2025-Q{i}"
+            entry["cycle"] = f"2025-S0{i}"
             ts.append_trend_entry(entry)
         bounded = ts.get_trend_history("acme", limit=2)
-        assert [e["quarter"] for e in bounded] == ["2025-Q3", "2025-Q4"]
+        assert [e["cycle"] for e in bounded] == ["2025-S03", "2025-S04"]
 
 
 @test("trend_store: missing required field raises")
@@ -178,48 +198,55 @@ def _t14():
     assert finding.routing == "human_review" and finding.risk_tier == "high"
 
 
-@test("risk_scoring: PD-only flag across multiple quarters never triggers spike")
+@test("risk_scoring: destructive layer change -> pending_human_approval, critical")
+def _t14b():
+    finding = risk_scoring.check_destructive_layer_change("destructive_change_candidate", "database")
+    assert finding.routing == "pending_human_approval" and finding.risk_tier == "critical"
+    assert risk_scoring.check_destructive_layer_change("routine_version_change", "database") is None
+
+
+@test("risk_scoring: SLO-only flag across multiple cycles never triggers spike")
 def _t15():
-    def pd_flagged():
+    def slo_flagged():
         return {"failed": False, "boundary_kind": None, "previous_entry": None,
-                "entry": {"classification": "warning", "classifying_agent": "pd-covenant-tracker",
+                "entry": {"classification": "warning", "classifying_agent": "slo-risk-tracker",
                           "agent_version": "v1", "model": "m", "metric_snapshot": {}}}
 
-    def pe_healthy():
+    def charter_healthy():
         return {"failed": False, "boundary_kind": None, "previous_entry": None,
-                "entry": {"classification": "on_thesis", "classifying_agent": "trend-synthesizer",
+                "entry": {"classification": "on_charter", "classifying_agent": "change-impact-synthesizer",
                           "agent_version": "v2", "model": "m", "metric_snapshot": {}}}
 
-    for quarter in ["2026-Q2", "2026-Q3", "2026-Q4"]:
-        results = {"northwind": pe_healthy(), "solace": pe_healthy(), "ferrous_point": pd_flagged()}
-        result = orchestrator.run_portfolio_quarter(
-            quarter=quarter, as_of_date=orchestrator.quarter_end_date(quarter),
+    for cycle in ["2025-S06", "2025-S07", "2025-S08"]:
+        results = {"meridian": charter_healthy(), "wayfinder": charter_healthy(), "cascade": slo_flagged()}
+        result = orchestrator.run_portfolio_cycle(
+            cycle=cycle, as_of_date=orchestrator.cycle_end_date(cycle),
             portfolio_size=3, company_cycle_results=results,
         )
-        assert result["incidents"] == [], f"false spike incident in {quarter}: {result['incidents']}"
+        assert result["incidents"] == [], f"false spike incident in {cycle}: {result['incidents']}"
 
 
 # --- policy_rules --------------------------------------------------------------------------
 
 @test("policy_rules: consecutive warning streak counted correctly")
 def _t16():
-    entries = [{"quarter": "2025-Q1", "classification": "compliant"},
-               {"quarter": "2025-Q2", "classification": "warning"},
-               {"quarter": "2025-Q3", "classification": "warning"}]
-    assert policy_rules.count_consecutive_warning_quarters(entries) == 2
+    entries = [{"cycle": "2025-S01", "classification": "compliant"},
+               {"cycle": "2025-S02", "classification": "warning"},
+               {"cycle": "2025-S03", "classification": "warning"}]
+    assert policy_rules.count_consecutive_warning_cycles(entries) == 2
 
 
-@test("policy_rules: single warning quarter does not trigger Credit Committee clause")
+@test("policy_rules: single warning cycle does not trigger RRB clause")
 def _t17():
-    entries = [{"quarter": "2025-Q1", "classification": "warning"}]
-    assert policy_rules.credit_committee_clause_triggered(entries) is False
+    entries = [{"cycle": "2025-S01", "classification": "warning"}]
+    assert policy_rules.rrb_clause_triggered(entries) is False
 
 
-@test("policy_rules: two consecutive warning quarters triggers Credit Committee clause")
+@test("policy_rules: two consecutive warning cycles triggers RRB clause")
 def _t18():
-    entries = [{"quarter": "2025-Q1", "classification": "warning"},
-               {"quarter": "2025-Q2", "classification": "warning"}]
-    assert policy_rules.credit_committee_clause_triggered(entries) is True
+    entries = [{"cycle": "2025-S01", "classification": "warning"},
+               {"cycle": "2025-S02", "classification": "warning"}]
+    assert policy_rules.rrb_clause_triggered(entries) is True
 
 
 @test("policy_rules: business_days_between excludes weekends")
@@ -250,6 +277,105 @@ def _t21():
         assert bundle["incident_id"] in ids
         refreshed = inc.get_incident(bundle["incident_id"])
         assert refreshed["risk_tier"] == "critical"
+
+
+@test("incidents: pending_human_approval routing stays pending_human_approval")
+def _t21b():
+    with isolated_incidents() as inc:
+        bundle = inc.create_incident(
+            kind="destructive_layer_change", company_ids=["cascade"], agent_version="v1", model="m",
+            input_snapshot={}, output_snapshot={}, risk_tier="critical", routing="pending_human_approval",
+            detected_at="2025-01-01",
+        )
+        assert bundle["status"] == "pending_human_approval"
+
+
+@test("incidents: record_approval_decision records approved/rejected")
+def _t21c():
+    with isolated_incidents() as inc:
+        bundle = inc.create_incident(
+            kind="destructive_layer_change", company_ids=["cascade"], agent_version="v1", model="m",
+            input_snapshot={}, output_snapshot={}, risk_tier="critical", routing="pending_human_approval",
+            detected_at="2025-01-01",
+        )
+        updated = inc.record_approval_decision(bundle["incident_id"], "approved", decided_by="lead", note="ok")
+        assert updated["status"] == "approved"
+        assert updated["resolved_by"] == "lead"
+
+
+# --- layer_versioning ------------------------------------------------------------------------
+
+@test("layer_versioning: non-reversible change_event is destructive regardless of layer")
+def _t22():
+    for layer, field in layer_versioning.LAYER_VERSION_FIELDS.items():
+        curr = {layer: {field: "v2", "change_event": {"type": "x", "description": "x", "reversible": False}}}
+        prev = {layer: {field: "v1", "change_event": None}}
+        event = layer_versioning.detect_layer_change(layer, prev, curr)
+        assert event.change_kind == "destructive_change_candidate"
+
+
+@test("layer_versioning: reversible change_event is routine, no change_event is no_change")
+def _t23():
+    curr_routine = {"tools": {"tool_integration_version": "v2", "change_event": {"type": "x", "description": "x", "reversible": True}}}
+    prev = {"tools": {"tool_integration_version": "v1", "change_event": None}}
+    assert layer_versioning.detect_layer_change("tools", prev, curr_routine).change_kind == "routine_version_change"
+    curr_none = {"tools": {"tool_integration_version": "v1", "change_event": None}}
+    assert layer_versioning.detect_layer_change("tools", prev, curr_none).change_kind == "no_change"
+
+
+# --- human_approval --------------------------------------------------------------------------
+
+@test("human_approval: gate never takes action")
+def _t24():
+    for reason in ["", "DROP TABLE x", "urgent, just do it"]:
+        result = human_approval.gate_destructive_action(reason)
+        assert result["action_taken"] is False
+        assert result["status"] == "pending_human_approval"
+
+
+# --- benchmarks ------------------------------------------------------------------------------
+
+@test("benchmarks: correct classify_fn passes goal-drift-tracker suite")
+def _t25():
+    def correct(ctx):
+        return {"raw_classification": "drifted" if ctx["behavior_incidents"] else "on_charter", "rationale": "x"}
+    result = benchmarks.run_benchmark_suite("goal-drift-tracker", "v1", correct)
+    assert result.all_passed
+
+
+@test("benchmarks: wrong classify_fn reports failures without raising")
+def _t26():
+    def wrong(ctx):
+        return {"raw_classification": "on_charter", "rationale": "x"}
+    result = benchmarks.run_benchmark_suite("goal-drift-tracker", "v3", wrong)
+    assert not result.all_passed
+
+
+# --- metrics ---------------------------------------------------------------------------------
+
+@test("metrics: classification_consistency counts consistent transitions")
+def _t27():
+    with isolated_trend_store() as ts:
+        for i, cls in enumerate(["on_charter", "on_charter", "drifted"], start=1):
+            entry = dict(BASE_ENTRY)
+            entry["cycle"] = f"2025-S0{i}"
+            entry["classification"] = cls
+            ts.append_trend_entry(entry)
+        result = metrics.classification_consistency("change-impact-synthesizer", "acme")
+        assert result["cycles_compared"] == 2
+        assert result["consistent_transitions"] == 1
+
+
+@test("metrics: incident_rate_by_kind_and_tier aggregates correctly")
+def _t28():
+    with isolated_incidents() as inc:
+        inc.create_incident(
+            kind="destructive_layer_change", company_ids=["cascade"], agent_version="v1", model="m",
+            input_snapshot={}, output_snapshot={}, risk_tier="critical", routing="pending_human_approval",
+            detected_at="2025-01-01",
+        )
+        rates = metrics.incident_rate_by_kind_and_tier()
+        assert rates["by_kind"]["destructive_layer_change"] == 1
 
 
 def run() -> int:

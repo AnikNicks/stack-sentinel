@@ -1,4 +1,4 @@
-"""Deterministic risk scoring. Three rules, each one-sentence-justifiable, zero LLM.
+"""Deterministic risk scoring. Four rules, each one-sentence-justifiable, zero LLM.
 
 These rules are what fills the role a "procedural memory" system might otherwise fill in an
 agentic system: instead of a learned, opaque pattern store, the rules that decide when to
@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 RiskTier = Literal["low", "medium", "high", "critical"]
-Routing = Literal["auto_rollback", "human_review", "none"]
+Routing = Literal["auto_rollback", "human_review", "pending_human_approval", "none"]
 
 # Tuned for a small portfolio (3-5 companies): an absolute count, not a ratio against a
 # near-zero baseline, so a single genuine, unrelated flag never trips it.
@@ -20,7 +20,8 @@ SYSTEMIC_SPIKE_THRESHOLD = 2
 
 @dataclass
 class RiskFinding:
-    kind: Literal["systemic_flag_spike", "model_boundary_ambiguity", "policy_violation"]
+    kind: Literal["systemic_flag_spike", "model_boundary_ambiguity", "policy_violation",
+                   "destructive_layer_change"]
     risk_tier: RiskTier
     routing: Routing
     justification: str
@@ -87,8 +88,8 @@ def check_model_boundary_ambiguity(boundary_kind: str | None) -> RiskFinding | N
 
 
 def check_policy_violation(violation_detected: bool, detail: str = "") -> RiskFinding | None:
-    """A policy-compliance miss (e.g. a covenant warning uncounted toward the Credit
-    Committee reporting clause) is inherently a human-judgment-required case, per the same
+    """A policy-compliance miss (e.g. an SLO warning uncounted toward the Reliability Review
+    Board reporting clause) is inherently a human-judgment-required case, per the same
     guardrail discipline as the model-boundary rule — a policy miss doesn't get silently
     auto-corrected, it gets surfaced to a human.
     """
@@ -103,18 +104,49 @@ def check_policy_violation(violation_detected: bool, detail: str = "") -> RiskFi
     return None
 
 
+def check_destructive_layer_change(
+    change_kind: str, layer: str, detail: str = "",
+) -> RiskFinding | None:
+    """A layer-level change_event assessed as non-reversible (data-loss potential, a schema
+    drop without a verified rollback path, credential rotation without a fallback, etc.) must
+    never be auto-remediated. This fires unconditionally on
+    change_kind == "destructive_change_candidate", regardless of which layer — reversibility
+    is a literal, provided fact (layer_versioning.detect_layer_change already computed it),
+    not a judgment call, so no agent adjudicates this; it always routes to
+    pending_human_approval and pulse/human_approval.py is the only thing ever called next.
+    """
+    if change_kind == "destructive_change_candidate":
+        return RiskFinding(
+            kind="destructive_layer_change",
+            risk_tier="critical",
+            routing="pending_human_approval",
+            justification=(
+                f"Non-reversible change_event on the '{layer}' layer — per policy, any "
+                "irreversible layer change must be routed to a human for an explicit, logged "
+                "decision before any downstream action proceeds; it is never auto-executed."
+                + (f" {detail}" if detail else "")
+            ),
+            detail={"layer": layer, "change_kind": change_kind},
+        )
+    return None
+
+
 def assess_cycle(
     *, flagged_company_ids: list[str], portfolio_size: int,
     boundary_kind: str | None = None,
     policy_violation_detected: bool = False, policy_violation_detail: str = "",
+    destructive_layer_change: tuple[str, str] | None = None,
 ) -> list[RiskFinding]:
-    """Run all three checks for one quarterly cycle. Returns every finding that fired —
-    zero, one, or more than one can fire in the same cycle."""
+    """Run all four checks for one sprint cycle. Returns every finding that fired — zero,
+    one, or more than one can fire in the same cycle. destructive_layer_change, if given, is
+    (layer, change_kind) for one layer's change_event this cycle."""
     findings = []
     for finding in (
         check_systemic_flag_spike(flagged_company_ids, portfolio_size),
         check_model_boundary_ambiguity(boundary_kind),
         check_policy_violation(policy_violation_detected, policy_violation_detail),
+        check_destructive_layer_change(destructive_layer_change[1], destructive_layer_change[0])
+        if destructive_layer_change is not None else None,
     ):
         if finding is not None:
             findings.append(finding)

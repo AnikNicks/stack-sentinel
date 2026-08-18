@@ -5,36 +5,36 @@ from pulse import policy_rules
 
 def _entries(*classifications):
     return [
-        {"quarter": f"2025-Q{i+1}", "classification": c}
+        {"cycle": f"2025-S{i+1:02d}", "classification": c}
         for i, c in enumerate(classifications)
     ]
 
 
-def test_count_consecutive_warning_quarters_counts_trailing_streak_only():
+def test_count_consecutive_warning_cycles_counts_trailing_streak_only():
     entries = _entries("compliant", "warning", "warning", "warning")
-    assert policy_rules.count_consecutive_warning_quarters(entries) == 3
+    assert policy_rules.count_consecutive_warning_cycles(entries) == 3
 
 
 def test_count_consecutive_resets_on_break():
     entries = _entries("warning", "compliant", "warning")
-    assert policy_rules.count_consecutive_warning_quarters(entries) == 1
+    assert policy_rules.count_consecutive_warning_cycles(entries) == 1
 
 
-def test_single_warning_quarter_does_not_trigger_credit_committee_clause():
+def test_single_warning_cycle_does_not_trigger_rrb_clause():
     entries = _entries("compliant", "warning")
-    assert policy_rules.credit_committee_clause_triggered(entries) is False
+    assert policy_rules.rrb_clause_triggered(entries) is False
 
 
-def test_two_consecutive_warning_quarters_triggers_credit_committee_clause():
+def test_two_consecutive_warning_cycles_triggers_rrb_clause():
     entries = _entries("compliant", "warning", "warning")
-    assert policy_rules.credit_committee_clause_triggered(entries) is True
+    assert policy_rules.rrb_clause_triggered(entries) is True
 
 
 def test_clause_stays_triggered_regardless_of_trend_direction():
     """Per the policy text: '...regardless of trend direction.' Two consecutive warning
-    quarters trigger the clause whether the ratio is improving or worsening between them."""
+    cycles trigger the clause whether the ratio is improving or worsening between them."""
     improving = _entries("compliant", "warning", "warning")  # still warning either way, direction irrelevant to trigger
-    assert policy_rules.credit_committee_clause_triggered(improving) is True
+    assert policy_rules.rrb_clause_triggered(improving) is True
 
 
 def test_business_days_between_excludes_weekends():
@@ -49,12 +49,12 @@ def test_business_days_between_same_day_is_zero():
     assert policy_rules.business_days_between(d, d) == 0
 
 
-def test_deal_partner_review_sla_status_breach_detection():
+def test_engineering_review_sla_status_breach_detection():
     classified_at = date(2025, 1, 6)  # Monday
-    within_sla = policy_rules.deal_partner_review_sla_status(classified_at, date(2025, 1, 10))
+    within_sla = policy_rules.engineering_review_sla_status(classified_at, date(2025, 1, 10))
     assert within_sla["sla_breached"] is False
 
-    past_sla = policy_rules.deal_partner_review_sla_status(classified_at, date(2025, 1, 15))
+    past_sla = policy_rules.engineering_review_sla_status(classified_at, date(2025, 1, 15))
     assert past_sla["sla_breached"] is True
 
 

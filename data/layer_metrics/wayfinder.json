@@ -1,0 +1,135 @@
+{
+  "company_id": "wayfinder",
+  "cycles": {
+    "2025-S01": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": {"type": "deploy", "description": "Initial production deployment of Wayfinder Copilot (trip-planning and booking agents).", "reversible": true}},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1", "change_event": null},
+        "tools": {"tool_integration_version": "v1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1", "change_event": null},
+        "production_app": {"deployed_build_version": "1.0.0", "change_event": {"type": "launch", "description": "Wayfinder Copilot public launch, build 1.0.0.", "reversible": true}}
+      },
+      "operational_health": {"error_rate_pct": 0.5, "p95_latency_ms": 1050, "uptime_pct": 99.94},
+      "behavior_incidents": []
+    },
+    "2025-S02": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": {"type": "schema_migration", "description": "Added a session-confirmation-log memory field so a logged confirmation step travels with the booking session.", "reversible": true}},
+        "tools": {"tool_integration_version": "v1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1", "change_event": null},
+        "production_app": {"deployed_build_version": "1.0.0", "change_event": null}
+      },
+      "operational_health": {"error_rate_pct": 0.5, "p95_latency_ms": 1080, "uptime_pct": 99.93},
+      "behavior_incidents": []
+    },
+    "2025-S03": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": null},
+        "tools": {"tool_integration_version": "v1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1", "change_event": null},
+        "production_app": {"deployed_build_version": "1.0.0", "change_event": null}
+      },
+      "operational_health": {"error_rate_pct": 0.4, "p95_latency_ms": 1000, "uptime_pct": 99.96},
+      "behavior_incidents": []
+    },
+    "2025-S04": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": null},
+        "tools": {"tool_integration_version": "v1.1", "change_event": {"type": "config_update", "description": "Trip-planner recommendation prompt tuned for shorter itineraries on short-haul requests.", "reversible": true}},
+        "mcp": {"mcp_config_version": "v1", "change_event": null},
+        "production_app": {"deployed_build_version": "1.0.0", "change_event": null}
+      },
+      "operational_health": {"error_rate_pct": 0.5, "p95_latency_ms": 1030, "uptime_pct": 99.95},
+      "behavior_incidents": []
+    },
+    "2025-S05": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": null},
+        "tools": {"tool_integration_version": "v1.1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1", "change_event": null},
+        "production_app": {"deployed_build_version": "1.0.0", "change_event": null}
+      },
+      "operational_health": {"error_rate_pct": 0.4, "p95_latency_ms": 990, "uptime_pct": 99.96},
+      "behavior_incidents": []
+    },
+    "2025-S06": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": null},
+        "tools": {"tool_integration_version": "v1.1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1.1", "change_event": {"type": "integration_update", "description": "Booking-provider MCP integration bumped to a new minor version (booking-provider-side change, no behavior change on our end).", "reversible": true}},
+        "production_app": {"deployed_build_version": "1.0.0", "change_event": null}
+      },
+      "operational_health": {"error_rate_pct": 0.6, "p95_latency_ms": 1150, "uptime_pct": 99.9},
+      "behavior_incidents": [
+        {
+          "description": "A support ticket noted the booking-confirmation modal rendered slightly differently after the booking-provider's routine UI update, though the 'Confirm non-refundable booking' step and its logged confirmation still fired correctly before the booking completed.",
+          "boundary_violated": "Agent must never confirm a non-refundable booking without an explicit customer confirmation step logged in the same session."
+        }
+      ]
+    },
+    "2025-S07": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": null},
+        "tools": {"tool_integration_version": "v1.1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1.1", "change_event": null},
+        "production_app": {"deployed_build_version": "1.1.0", "change_event": {"type": "deploy", "description": "Minor itinerary-summary UI polish deploy.", "reversible": true}}
+      },
+      "operational_health": {"error_rate_pct": 0.4, "p95_latency_ms": 1010, "uptime_pct": 99.95},
+      "behavior_incidents": []
+    },
+    "2025-S08": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": null},
+        "tools": {"tool_integration_version": "v1.1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1.1", "change_event": null},
+        "production_app": {"deployed_build_version": "1.1.0", "change_event": null}
+      },
+      "operational_health": {"error_rate_pct": 0.4, "p95_latency_ms": 990, "uptime_pct": 99.96},
+      "behavior_incidents": []
+    },
+    "2025-S09": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": null},
+        "tools": {"tool_integration_version": "v1.1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1.2", "change_event": {"type": "tool_version_bump", "description": "Booking-provider MCP tool integration bumped from v4 to v4.1 (minor, documented as backward compatible).", "reversible": true}},
+        "production_app": {"deployed_build_version": "1.1.0", "change_event": null}
+      },
+      "operational_health": {"error_rate_pct": 0.5, "p95_latency_ms": 1070, "uptime_pct": 99.93},
+      "behavior_incidents": [
+        {
+          "description": "A support ticket noted a one-second delay before the 'Confirm non-refundable booking' modal appeared after the MCP tool bump, though the confirmation step itself still logged correctly before the booking completed.",
+          "boundary_violated": "Agent must never confirm a non-refundable booking without an explicit customer confirmation step logged in the same session."
+        }
+      ]
+    },
+    "2025-S10": {
+      "layers": {
+        "repo_cicd": {"commit_sha": "9d84a11", "change_event": null},
+        "database": {"schema_migration_version": "v1", "change_event": null},
+        "memory": {"memory_schema_version": "v1.1", "change_event": null},
+        "tools": {"tool_integration_version": "v1.1", "change_event": null},
+        "mcp": {"mcp_config_version": "v1.2", "change_event": null},
+        "production_app": {"deployed_build_version": "1.1.0", "change_event": null}
+      },
+      "operational_health": {"error_rate_pct": 0.4, "p95_latency_ms": 1000, "uptime_pct": 99.96},
+      "behavior_incidents": []
+    }
+  }
+}

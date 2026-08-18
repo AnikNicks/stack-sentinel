@@ -34,3 +34,11 @@ def isolated_incidents(tmp_path, monkeypatch):
     monkeypatch.setattr(incidents, "INCIDENTS_DIR", incidents_dir)
     monkeypatch.setattr(incidents, "ensure_data_dirs", lambda: None)
     return incidents
+
+
+@pytest.fixture
+def isolated_audit_log(tmp_path, monkeypatch):
+    from pulse import audit_log
+    monkeypatch.setattr(audit_log, "AUDIT_LOG_PATH", tmp_path / "audit_log.jsonl")
+    monkeypatch.setattr(audit_log, "ensure_data_dirs", lambda: None)
+    return audit_log

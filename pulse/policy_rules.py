@@ -14,21 +14,21 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-CONSECUTIVE_WARNING_THRESHOLD_FOR_CREDIT_COMMITTEE = 2
-DEAL_PARTNER_REVIEW_SLA_BUSINESS_DAYS = 5
+CONSECUTIVE_WARNING_THRESHOLD_FOR_RRB = 2
+ENGINEERING_REVIEW_SLA_BUSINESS_DAYS = 5
 STALE_PENDING_REVIEW_BUSINESS_DAYS = 10
 
 
-def _quarter_sort_key(quarter: str) -> tuple[int, int]:
-    year_str, q_str = quarter.split("-Q")
-    return (int(year_str), int(q_str))
+def _cycle_sort_key(cycle: str) -> tuple[int, int]:
+    year_str, s_str = cycle.split("-S")
+    return (int(year_str), int(s_str))
 
 
-def count_consecutive_warning_quarters(trend_entries: list[dict[str, Any]],
-                                        warning_value: str = "warning") -> int:
+def count_consecutive_warning_cycles(trend_entries: list[dict[str, Any]],
+                                      warning_value: str = "warning") -> int:
     """Count the current unbroken streak of `classification == warning_value` entries,
-    counting backward from the most recent quarter. Entries must be oldest-first."""
-    entries = sorted(trend_entries, key=lambda e: _quarter_sort_key(e["quarter"]))
+    counting backward from the most recent cycle. Entries must be oldest-first."""
+    entries = sorted(trend_entries, key=lambda e: _cycle_sort_key(e["cycle"]))
     count = 0
     for entry in reversed(entries):
         if entry.get("classification") == warning_value:
@@ -38,11 +38,11 @@ def count_consecutive_warning_quarters(trend_entries: list[dict[str, Any]],
     return count
 
 
-def credit_committee_clause_triggered(trend_entries: list[dict[str, Any]]) -> bool:
-    """'Any covenant classified as warning for two or more consecutive reporting periods
-    must be reported to the Credit Committee at the next scheduled meeting, regardless of
-    trend direction.' — literal N-quarters count, exact per the policy text."""
-    return count_consecutive_warning_quarters(trend_entries) >= CONSECUTIVE_WARNING_THRESHOLD_FOR_CREDIT_COMMITTEE
+def rrb_clause_triggered(trend_entries: list[dict[str, Any]]) -> bool:
+    """'Any SLO classified as warning for two or more consecutive reporting periods must be
+    reported to the Reliability Review Board at the next scheduled meeting, regardless of
+    trend direction.' — literal N-cycles count, exact per the policy text."""
+    return count_consecutive_warning_cycles(trend_entries) >= CONSECUTIVE_WARNING_THRESHOLD_FOR_RRB
 
 
 def business_days_between(start: date, end: date) -> int:
@@ -59,15 +59,15 @@ def business_days_between(start: date, end: date) -> int:
     return days
 
 
-def deal_partner_review_sla_status(classified_at: date, as_of: date) -> dict[str, Any]:
-    """'A portfolio company classified off_thesis must receive deal-partner review within 5
+def engineering_review_sla_status(classified_at: date, as_of: date) -> dict[str, Any]:
+    """'A monitored system classified drifted must receive engineering review within 5
     business days of classification.' Returns whether the SLA is still open, and how many
     business days have elapsed."""
     elapsed = business_days_between(classified_at, as_of)
     return {
         "business_days_elapsed": elapsed,
-        "sla_business_days": DEAL_PARTNER_REVIEW_SLA_BUSINESS_DAYS,
-        "sla_breached": elapsed > DEAL_PARTNER_REVIEW_SLA_BUSINESS_DAYS,
+        "sla_business_days": ENGINEERING_REVIEW_SLA_BUSINESS_DAYS,
+        "sla_breached": elapsed > ENGINEERING_REVIEW_SLA_BUSINESS_DAYS,
     }
 
 

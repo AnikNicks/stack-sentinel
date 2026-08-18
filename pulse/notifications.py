@@ -5,7 +5,7 @@ pulse/orchestrator.py, with structured incident/classification data it already c
 never raw agent text.
 
 Real external calls go through the `mcp` SDK's own client, connecting as a subprocess to
-`docker mcp gateway run --profile portfolio-pulse` — the dedicated, isolated Docker MCP
+`docker mcp gateway run --profile stack-sentinel` — the dedicated, isolated Docker MCP
 Toolkit profile set up for this project (see PROGRESS.md / README.md for what that profile
 contains and why it's isolated from any other profile on this machine). This module does NOT
 use Claude Code's own MCP tool-calling — it is a real MCP *client* written in plain Python,
@@ -52,7 +52,7 @@ EMAIL_ADDRESS = os.environ.get("PULSE_EMAIL_ADDRESS", "claudecodenotification@gm
 SLACK_CHANNEL_ID = os.environ.get("PULSE_SLACK_CHANNEL_ID", "")
 JIRA_PROJECT_KEY = os.environ.get("PULSE_JIRA_PROJECT_KEY", "")
 CONFLUENCE_SPACE_KEY = os.environ.get("PULSE_CONFLUENCE_SPACE_KEY", "")
-DOCKER_MCP_PROFILE = os.environ.get("PULSE_DOCKER_MCP_PROFILE", "portfolio-pulse")
+DOCKER_MCP_PROFILE = os.environ.get("PULSE_DOCKER_MCP_PROFILE", "stack-sentinel")
 
 _LIVE = False
 
@@ -162,30 +162,30 @@ def _record(*, channel: str, target: str, purpose: str, detail: dict[str, Any],
     return entry
 
 
-def dispatch_off_thesis_review(company_id: str, company_name: str, quarter: str, as_of_date: date,
-                                rationale: str) -> list[dict[str, Any]]:
-    """'A portfolio company classified off_thesis must receive deal-partner review within 5
+def dispatch_drifted_review(company_id: str, company_name: str, cycle: str, as_of_date: date,
+                             rationale: str) -> list[dict[str, Any]]:
+    """'A monitored system classified drifted must receive engineering review within 5
     business days of classification.' -> Confluence review-record page + email alert."""
     records = []
     records.append(_record(
-        channel="confluence", target=CONFLUENCE_SPACE_KEY, purpose="off_thesis_deal_partner_review",
+        channel="confluence", target=CONFLUENCE_SPACE_KEY, purpose="drifted_engineering_review",
         detail={
-            "title": f"[Portfolio Pulse] Deal-partner review — {company_name} ({quarter})",
+            "title": f"[Stack Sentinel] Engineering review — {company_name} ({cycle})",
             "content": (
-                f"# Deal-partner review required\n\n**Company:** {company_name} ({company_id})\n"
-                f"**Quarter:** {quarter}\n**Classified:** off_thesis on {as_of_date.isoformat()}\n"
+                f"# Engineering review required\n\n**System:** {company_name} ({company_id})\n"
+                f"**Cycle:** {cycle}\n**Classified:** drifted on {as_of_date.isoformat()}\n"
                 f"**SLA:** review required within 5 business days of classification\n\n"
                 f"## Rationale\n{rationale}\n"
             ),
         },
     ))
     records.append(_record(
-        channel="email", target=EMAIL_ADDRESS, purpose="off_thesis_deal_partner_review",
+        channel="email", target=EMAIL_ADDRESS, purpose="drifted_engineering_review",
         detail={
-            "subject": f"[Portfolio Pulse] ACTION: {company_name} classified off_thesis ({quarter})",
+            "subject": f"[Stack Sentinel] ACTION: {company_name} classified drifted ({cycle})",
             "body": (
-                f"{company_name} ({company_id}) was classified off_thesis for {quarter} on "
-                f"{as_of_date.isoformat()}. Deal-partner review required within 5 business days "
+                f"{company_name} ({company_id}) was classified drifted for {cycle} on "
+                f"{as_of_date.isoformat()}. Engineering review required within 5 business days "
                 f"per the Monitoring & Escalation Policy.\n\nRationale: {rationale}"
             ),
         },
@@ -193,45 +193,45 @@ def dispatch_off_thesis_review(company_id: str, company_name: str, quarter: str,
     return records
 
 
-def dispatch_credit_committee_escalation(company_id: str, quarter: str, as_of_date: date) -> list[dict[str, Any]]:
-    """'Any covenant classified as warning for two or more consecutive reporting periods
-    must be reported to the Credit Committee at the next scheduled meeting.' -> Jira ticket +
+def dispatch_rrb_escalation(company_id: str, cycle: str, as_of_date: date) -> list[dict[str, Any]]:
+    """'Any SLO classified as warning for two or more consecutive reporting periods must be
+    reported to the Reliability Review Board at the next scheduled meeting.' -> Jira ticket +
     Confluence-tracked meeting-date entry (standing in for a real calendar invite — no
     Calendar MCP server exists in the catalog, see PROGRESS.md) + Slack post."""
     records = []
     records.append(_record(
-        channel="jira", target=JIRA_PROJECT_KEY, purpose="credit_committee_escalation",
+        channel="jira", target=JIRA_PROJECT_KEY, purpose="rrb_escalation",
         detail={
-            "summary": f"Credit Committee report: {company_id} covenant warning, 2+ consecutive quarters ({quarter})",
+            "summary": f"RRB report: {company_id} SLO warning, 2+ consecutive cycles ({cycle})",
             "description": (
-                f"{company_id}'s covenant has been classified warning for 2 or more consecutive "
-                f"reporting periods as of {quarter}. Per the Monitoring & Escalation Policy this "
-                f"must be reported to the Credit Committee at the next scheduled meeting, "
-                f"regardless of trend direction."
+                f"{company_id}'s SLO has been classified warning for 2 or more consecutive "
+                f"reporting periods as of {cycle}. Per the Monitoring & Escalation Policy this "
+                f"must be reported to the Reliability Review Board at the next scheduled "
+                f"meeting, regardless of trend direction."
             ),
         },
     ))
     records.append(_record(
-        channel="confluence", target=CONFLUENCE_SPACE_KEY, purpose="credit_committee_escalation",
+        channel="confluence", target=CONFLUENCE_SPACE_KEY, purpose="rrb_escalation",
         detail={
-            "title": f"[Portfolio Pulse] Credit Committee agenda item — {company_id} ({quarter})",
+            "title": f"[Stack Sentinel] RRB agenda item — {company_id} ({cycle})",
             "content": (
-                f"# Credit Committee reporting — {company_id}\n\n**Quarter:** {quarter}\n"
-                f"**Trigger:** covenant warning for 2+ consecutive quarters (as of {as_of_date.isoformat()})\n"
-                f"**Action:** add to next scheduled Credit Committee meeting agenda.\n"
+                f"# Reliability Review Board reporting — {company_id}\n\n**Cycle:** {cycle}\n"
+                f"**Trigger:** SLO warning for 2+ consecutive cycles (as of {as_of_date.isoformat()})\n"
+                f"**Action:** add to next scheduled RRB meeting agenda.\n"
             ),
         },
     ))
     records.append(_record(
-        channel="slack", target=SLACK_CHANNEL_ID, purpose="credit_committee_escalation",
-        detail={"text": f"[Portfolio Pulse] {company_id}: covenant warning for 2+ consecutive quarters "
-                         f"as of {quarter} — Credit Committee reporting clause triggered. Jira + Confluence created."},
+        channel="slack", target=SLACK_CHANNEL_ID, purpose="rrb_escalation",
+        detail={"text": f"[Stack Sentinel] {company_id}: SLO warning for 2+ consecutive cycles "
+                         f"as of {cycle} — RRB reporting clause triggered. Jira + Confluence created."},
     ))
     records += _dispatch_universal_email_if_high_risk(
-        company_id=company_id, purpose="credit_committee_escalation", risk_tier="high",
-        subject=f"[Portfolio Pulse] Credit Committee escalation — {company_id} ({quarter})",
-        body=f"{company_id}'s covenant warning has hit 2+ consecutive quarters as of {quarter}. "
-             f"Credit Committee reporting clause triggered; Jira ticket and Confluence page created.",
+        company_id=company_id, purpose="rrb_escalation", risk_tier="high",
+        subject=f"[Stack Sentinel] RRB escalation — {company_id} ({cycle})",
+        body=f"{company_id}'s SLO warning has hit 2+ consecutive cycles as of {cycle}. "
+             f"RRB reporting clause triggered; Jira ticket and Confluence page created.",
     )
     return records
 
@@ -262,16 +262,26 @@ def dispatch_for_incident(incident: dict[str, Any]) -> list[dict[str, Any]]:
     if kind == "systemic_flag_spike":
         records.append(_record(
             channel="slack", target=SLACK_CHANNEL_ID, purpose="systemic_flag_spike_rollback",
-            detail={"text": f"[Portfolio Pulse] AUTO-ROLLBACK: systemic flag spike detected "
+            detail={"text": f"[Stack Sentinel] AUTO-ROLLBACK: systemic flag spike detected "
                              f"({len(company_ids)} companies flagged: {', '.join(company_ids)}) — "
-                             f"trend-synthesizer auto-rolled back to last known-good version. "
+                             f"change-impact-synthesizer auto-rolled back to last known-good "
+                             f"version. Incident {incident['incident_id']}."},
+            incident_id=incident["incident_id"],
+        ))
+    elif kind == "destructive_layer_change":
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose="destructive_layer_change_pending_approval",
+            detail={"text": f"[Stack Sentinel] BLOCKED — PENDING HUMAN APPROVAL: a non-reversible "
+                             f"layer change was detected for {', '.join(company_ids)} and has NOT "
+                             f"been executed. No automated action was taken; an explicit, logged "
+                             f"human decision is required before anything proceeds. "
                              f"Incident {incident['incident_id']}."},
             incident_id=incident["incident_id"],
         ))
 
     records += _dispatch_universal_email_if_high_risk(
         company_id=",".join(company_ids), purpose=kind, risk_tier=incident["risk_tier"],
-        subject=f"[Portfolio Pulse] {incident['risk_tier'].upper()} incident: {kind} ({incident['incident_id']})",
+        subject=f"[Stack Sentinel] {incident['risk_tier'].upper()} incident: {kind} ({incident['incident_id']})",
         body=(
             f"Incident {incident['incident_id']} ({kind}) detected at {incident['detected_at']} — "
             f"companies: {', '.join(company_ids)}. Routing: {incident['routing']}. "
@@ -287,7 +297,7 @@ def dispatch_stale_reescalation(incident: dict[str, Any]) -> list[dict[str, Any]
     treated as implicit approval by silence."""
     return [_record(
         channel="slack", target=SLACK_CHANNEL_ID, purpose="stale_pending_review_reescalation",
-        detail={"text": f"[Portfolio Pulse] RE-NOTIFY: incident {incident['incident_id']} "
+        detail={"text": f"[Stack Sentinel] RE-NOTIFY: incident {incident['incident_id']} "
                          f"({incident['kind']}) has been pending_review past the stale threshold — "
                          f"escalated to {incident['risk_tier']}. Not implicitly approved by silence."},
         incident_id=incident["incident_id"],

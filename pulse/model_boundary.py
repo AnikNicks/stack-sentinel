@@ -1,9 +1,10 @@
 """Pure comparison between two consecutive trend-store entries for the same company.
 
-This is the reproducibility mechanism the whole project exists to support: over a 3-5 year
-hold the underlying LLM will change multiple times, and if a trend suddenly breaks, this
-module is how you find out — from plain data, not from a model call — whether that's the
-business changing or the model quietly changing interpretation underneath a "pinned" version.
+This is the reproducibility mechanism the whole project exists to support: over a multi-year
+monitoring engagement the underlying LLM will change multiple times, and if a trend suddenly
+breaks, this module is how you find out — from plain data, not from a model call — whether
+that's the monitored system's real behavior changing or the model quietly changing
+interpretation underneath a "pinned" version.
 
 No LLM involvement. Two dicts in, one label out.
 """

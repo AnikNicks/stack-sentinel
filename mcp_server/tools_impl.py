@@ -1,4 +1,4 @@
-"""Real implementations behind the 7 portfolio-directory MCP tools.
+"""Real implementations behind the 7 stack-sentinel-directory MCP tools.
 
 Each function takes an explicit `caller` dict ({"agent": ..., "agent_version": ...}) rather
 than trying to infer it from protocol context — the standard MCP tool-call wire format
@@ -10,9 +10,9 @@ guardrail treats with suspicion). Two real call sites provide this differently:
 - mcp_server/server.py's live MCP tool wrappers pass a generic "mcp-client / external"
   caller, since a real protocol round-trip genuinely doesn't have better information — this
   is a known, documented limitation, not silently glossed over.
-- pulse/orchestrator.py calls these same functions in-process during a quarterly cycle (and
-  the simulation), where the orchestrator genuinely does know which agent + pinned version
-  it is currently invoking, so it passes that real context through.
+- pulse/orchestrator.py calls these same functions in-process during a sprint cycle (and the
+  simulation), where the orchestrator genuinely does know which agent + pinned version it is
+  currently invoking, so it passes that real context through.
 
 append_trend_entry is the only write tool, and per CLAUDE.md's guardrails it is called only
 by the orchestration layer with an agent's own validated structured output — never by an
@@ -25,7 +25,7 @@ import json
 from typing import Any
 
 from pulse import audit_log, trend_store, vector_store
-from pulse.paths import COMPANIES_PATH, FINANCIALS_DIR
+from pulse.paths import COMPANIES_PATH, LAYER_METRICS_DIR
 from pulse.retry import PermanentError, call_with_retry
 
 _companies_cache: dict[str, Any] | None = None
@@ -67,7 +67,7 @@ def get_company_display_name(company_id: str) -> str:
 def list_portfolio_companies(*, caller: dict[str, str]) -> list[dict[str, Any]]:
     companies = _load_companies()
     result = [
-        {"company_id": c["company_id"], "name": c["name"], "relationship_type": c["relationship_type"],
+        {"company_id": c["company_id"], "name": c["name"], "monitoring_track": c["monitoring_track"],
          "sector": c["sector"]}
         for c in companies.values()
     ]
@@ -75,44 +75,46 @@ def list_portfolio_companies(*, caller: dict[str, str]) -> list[dict[str, Any]]:
     return result
 
 
-def get_investment_thesis(company_id: str, *, caller: dict[str, str]) -> dict[str, Any]:
-    """PE only — raises PermanentError (never retried) if called on a non-PE company."""
+def get_system_charter(company_id: str, *, caller: dict[str, str]) -> dict[str, Any]:
+    """CHARTER only — raises PermanentError (never retried) if called on a non-CHARTER company."""
     company = _get_company_or_raise(company_id)
-    if company["relationship_type"] != "PE":
+    if company["monitoring_track"] != "CHARTER":
         raise PermanentError(
-            f"get_investment_thesis called on non-PE company '{company_id}' "
-            f"(relationship_type={company['relationship_type']}) — use get_loan_agreement instead"
+            f"get_system_charter called on non-CHARTER company '{company_id}' "
+            f"(monitoring_track={company['monitoring_track']}) — use get_slo_agreement instead"
         )
-    thesis = company["investment_thesis"]
-    _log(caller, "get_investment_thesis", {"company_id": company_id}, "thesis returned")
-    return thesis
+    charter = company["system_charter"]
+    _log(caller, "get_system_charter", {"company_id": company_id}, "charter returned")
+    return charter
 
 
-def get_loan_agreement(company_id: str, *, caller: dict[str, str]) -> dict[str, Any]:
-    """PD only — raises PermanentError (never retried) if called on a non-PD company."""
+def get_slo_agreement(company_id: str, *, caller: dict[str, str]) -> dict[str, Any]:
+    """SLO only — raises PermanentError (never retried) if called on a non-SLO company."""
     company = _get_company_or_raise(company_id)
-    if company["relationship_type"] != "PD":
+    if company["monitoring_track"] != "SLO":
         raise PermanentError(
-            f"get_loan_agreement called on non-PD company '{company_id}' "
-            f"(relationship_type={company['relationship_type']}) — use get_investment_thesis instead"
+            f"get_slo_agreement called on non-SLO company '{company_id}' "
+            f"(monitoring_track={company['monitoring_track']}) — use get_system_charter instead"
         )
-    agreement = company["loan_agreement"]
-    _log(caller, "get_loan_agreement", {"company_id": company_id}, "loan agreement returned")
+    agreement = company["slo_agreement"]
+    _log(caller, "get_slo_agreement", {"company_id": company_id}, "SLO agreement returned")
     return agreement
 
 
-def get_financials(company_id: str, period: str, *, caller: dict[str, str]) -> dict[str, Any]:
+def get_system_metrics(company_id: str, cycle: str, *, caller: dict[str, str]) -> dict[str, Any]:
+    """One call, one cycle: the full structured snapshot (layers + operational_health +
+    behavior_incidents) — replaces the old scalar-KPI get_financials."""
     _get_company_or_raise(company_id)
-    path = FINANCIALS_DIR / f"{company_id}.json"
+    path = LAYER_METRICS_DIR / f"{company_id}.json"
     if not path.exists():
-        raise PermanentError(f"no financials file for company_id '{company_id}'")
+        raise PermanentError(f"no layer_metrics file for company_id '{company_id}'")
     with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
-    quarters = data["quarters"]
-    if period not in quarters:
-        raise PermanentError(f"no financials recorded for {company_id} in period '{period}'")
-    _log(caller, "get_financials", {"company_id": company_id, "period": period}, "financials returned")
-    return quarters[period]
+    cycles = data["cycles"]
+    if cycle not in cycles:
+        raise PermanentError(f"no system metrics recorded for {company_id} in cycle '{cycle}'")
+    _log(caller, "get_system_metrics", {"company_id": company_id, "cycle": cycle}, "system metrics returned")
+    return cycles[cycle]
 
 
 def get_trend_history(company_id: str, limit: int | None = None, *, caller: dict[str, str]) -> list[dict[str, Any]]:
@@ -126,7 +128,7 @@ def append_trend_entry(entry: dict[str, Any], *, caller: dict[str, str]) -> dict
     """The only write tool. Called only by pulse/orchestrator.py, never by an agent directly."""
     result = trend_store.append_trend_entry(entry)
     _log(caller, "append_trend_entry",
-         {"company_id": entry.get("company_id"), "quarter": entry.get("quarter")},
+         {"company_id": entry.get("company_id"), "cycle": entry.get("cycle")},
          f"classification={result.get('classification')}")
     return result
 

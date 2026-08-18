@@ -18,7 +18,8 @@ from typing import Any, Literal
 from pulse import policy_rules
 from pulse.paths import INCIDENTS_DIR, ensure_data_dirs
 
-Status = Literal["auto_resolved", "pending_review", "reviewed"]
+Status = Literal["auto_resolved", "pending_review", "reviewed",
+                  "pending_human_approval", "approved", "rejected"]
 
 _SEVERITY_ORDER = ["low", "medium", "high", "critical"]
 
@@ -49,10 +50,15 @@ def create_incident(
     risk_tier: str, routing: str, detected_at: str,
     remediation_detail: str = "", counterfactual: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Create and persist a new incident replay bundle. detected_at is the SIMULATED quarter
+    """Create and persist a new incident replay bundle. detected_at is the SIMULATED cycle
     date (not wall-clock time), so the record stays meaningful when replayed later."""
     incident_id = _next_incident_id()
-    status: Status = "auto_resolved" if routing == "auto_rollback" else "pending_review"
+    if routing == "auto_rollback":
+        status: Status = "auto_resolved"
+    elif routing == "pending_human_approval":
+        status = "pending_human_approval"
+    else:
+        status = "pending_review"
 
     bundle = {
         "incident_id": incident_id,
@@ -116,6 +122,24 @@ def record_human_review(incident_id: str, resolved_by: str, human_note: str,
     bundle["status"] = new_status
     bundle["resolved_by"] = resolved_by
     bundle["human_note"] = human_note
+    bundle["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+    _save(bundle)
+    return bundle
+
+
+def record_approval_decision(incident_id: str, decision: Literal["approved", "rejected"],
+                              decided_by: str, note: str) -> dict[str, Any]:
+    """The active-authorization write, for incidents routed to pending_human_approval —
+    distinct from record_human_review's passive confirmation of an already-taken automated
+    action. This is a human explicitly authorizing (or refusing) a destructive change that
+    pulse/human_approval.py has, up to this point, taken no action on whatsoever. Recording
+    "approved" here does not itself perform the underlying action — it only records that a
+    human has authorized it; any actual execution is a separate, deliberate step outside this
+    module."""
+    bundle = get_incident(incident_id)
+    bundle["status"] = decision
+    bundle["resolved_by"] = decided_by
+    bundle["human_note"] = note
     bundle["reviewed_at"] = datetime.now(timezone.utc).isoformat()
     _save(bundle)
     return bundle

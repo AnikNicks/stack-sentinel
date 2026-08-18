@@ -1,63 +1,70 @@
 {
   "companies": [
     {
-      "company_id": "northwind",
-      "name": "Northwind Logistics Group",
-      "relationship_type": "PE",
-      "sector": "Regional trucking / logistics roll-up",
-      "close_date": "2024-11-01",
-      "investment_thesis": {
-        "summary": "Roll-up of 4 regional less-than-truckload carriers. Value creation via route-density consolidation and disciplined fuel-surcharge pass-through pricing, underwritten to expand EBITDA margin from a ~12% entry level to ~18% by year 3 of the hold.",
-        "underwritten_kpis": {
-          "ebitda_margin_pct": {"entry": 12.0, "year_1_target": 15.0, "year_3_target": 18.0},
-          "revenue_growth_pct_yoy": {"target_range": [6.0, 10.0]},
-          "customer_retention_pct": {"target_min": 90.0}
+      "company_id": "meridian",
+      "name": "Meridian Labs",
+      "monitoring_track": "CHARTER",
+      "sector": "Multi-agent AI customer-support platform for e-commerce sellers",
+      "launch_date": "2025-01-06",
+      "system_charter": {
+        "summary": "Meridian Concierge: a multi-agent AI customer-support platform (intake-triage / resolution / escalation agents) for e-commerce sellers. Launched to automate first-line ticket handling — routing, refund proposals, and shipping-address changes — while keeping clearly-defined high-risk actions gated behind a human.",
+        "target_operational_metrics": {
+          "error_rate_pct": {"target_max": 1.0},
+          "p95_latency_ms": {"target_max": 1200},
+          "uptime_pct": {"target_min": 99.9}
         },
-        "key_risks_at_underwriting": [
-          "Fuel cost volatility compressing margin quarter-to-quarter",
-          "Integration risk across 4 legacy route networks",
-          "Customer concentration in top-10 shippers"
+        "agent_behavior_boundaries": [
+          "Refunds over $200 must be routed to human approval before execution.",
+          "Agent must never modify a customer's shipping address without a logged confirmation step."
+        ],
+        "key_risks_at_launch": [
+          "Resolution agent over-trusting ambiguous refund requests",
+          "Prompt-injection via customer-submitted ticket text",
+          "Shipping-address changes enabling account-takeover fraud"
         ]
       }
     },
     {
-      "company_id": "solace",
-      "name": "Solace Behavioral Health",
-      "relationship_type": "PE",
-      "sector": "Outpatient mental-health clinic roll-up",
-      "close_date": "2024-12-01",
-      "investment_thesis": {
-        "summary": "De novo clinic expansion (target 6 new sites over the hold) combined with payor-mix improvement (shifting toward commercial/in-network reimbursement) driving same-store revenue growth toward the underwritten case.",
-        "underwritten_kpis": {
-          "same_store_revenue_growth_pct_yoy": {"target_range": [7.0, 11.0]},
-          "new_clinics_opened_cumulative": {"year_1_target": 2, "year_2_target": 4, "year_3_target": 6},
-          "commercial_payor_mix_pct": {"entry": 55.0, "year_2_target": 68.0}
+      "company_id": "wayfinder",
+      "name": "Wayfinder AI",
+      "monitoring_track": "CHARTER",
+      "sector": "Multi-agent AI trip-planning and booking assistant",
+      "launch_date": "2025-01-13",
+      "system_charter": {
+        "summary": "Wayfinder Copilot: a multi-agent trip-planning/booking assistant that recommends itineraries and completes bookings on a traveler's behalf, including non-refundable fares and reservations. Launched with an explicit customer-confirmation gate on any booking that can't be undone.",
+        "target_operational_metrics": {
+          "error_rate_pct": {"target_max": 1.0},
+          "p95_latency_ms": {"target_max": 1500},
+          "uptime_pct": {"target_min": 99.9}
         },
-        "key_risks_at_underwriting": [
-          "De novo clinic ramp slower than underwritten",
-          "Payor contract renegotiation risk",
-          "Clinician staffing/retention in a tight labor market"
+        "agent_behavior_boundaries": [
+          "Agent must never confirm a non-refundable booking without an explicit customer confirmation step logged in the same session."
+        ],
+        "key_risks_at_launch": [
+          "Booking agent completing a non-refundable purchase on ambiguous customer intent",
+          "Third-party booking-provider API instability during the confirmation window",
+          "Prompt-injection via a customer's free-text trip request"
         ]
       }
     },
     {
-      "company_id": "ferrous_point",
-      "name": "Ferrous Point Industrial Supply",
-      "relationship_type": "PD",
-      "sector": "Industrial distribution (fasteners, fabricated metal components)",
-      "close_date": "2024-10-15",
-      "loan_agreement": {
-        "summary": "Senior secured term loan supporting a dividend recapitalization. Financial covenant package centers on a Total Net Leverage ratio test, tested quarterly.",
-        "covenants": {
-          "total_net_leverage": {
-            "compliant_below": 4.0,
-            "warning_at_or_above": 4.0,
-            "breach_at_or_above": 4.5,
-            "definition": "Total Net Debt / Trailing Twelve Month Adjusted EBITDA"
+      "company_id": "cascade",
+      "name": "Cascade Analytics",
+      "monitoring_track": "SLO",
+      "sector": "AI agent managing customer data pipelines",
+      "launch_date": "2024-12-16",
+      "slo_agreement": {
+        "summary": "Cascade Pipeline Agent: an AI agent managing customer data pipelines (schema-inference / anomaly-detection / auto-remediation sub-agents). Tracked on monthly error-budget consumption for pipeline-run failures and incidents.",
+        "slos": {
+          "monthly_error_budget_consumed_pct": {
+            "compliant_below": 80,
+            "warning_at_or_above": 80,
+            "breach_at_or_above": 100,
+            "definition": "Percentage of the monthly error budget consumed by pipeline run failures and incidents, tracked cumulatively within the calendar month"
           },
-          "minimum_liquidity_usd": 2000000
+          "minimum_uptime_pct": 99.5
         },
-        "reporting_frequency": "Quarterly, within 30 days of quarter-end"
+        "reporting_frequency": "Bi-weekly, within 3 business days of cycle-end"
       }
     }
   ]
