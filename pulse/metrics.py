@@ -79,7 +79,16 @@ def incident_rate_by_kind_and_tier() -> dict[str, dict[str, int]]:
 def approval_turnaround() -> list[dict[str, Any]]:
     """For every incident that reached pending_human_approval and has since been
     approved/rejected, business days between detected_at and reviewed_at, checked against
-    the same SLA machinery policy_rules.py already uses for review timeliness."""
+    the same SLA machinery policy_rules.py already uses for review timeliness.
+
+    Known limitation in this simulated environment: detected_at is the SIMULATED cycle date
+    (see pulse/incidents.create_incident), while reviewed_at is a real wall-clock timestamp
+    (pulse/incidents.record_approval_decision uses datetime.now()). In
+    scripts/simulate_production_run.py's scripted run these two clocks aren't aligned, so the
+    printed business-day figures for that run are not meaningful — the SLA math itself is
+    correct; only the demo's two input timestamps are on different clocks. In a real
+    deployment both timestamps are real wall-clock time and this figure is meaningful as-is.
+    """
     results = []
     for bundle in incidents_module.list_incidents():
         if bundle["status"] not in ("approved", "rejected") or not bundle.get("reviewed_at"):
