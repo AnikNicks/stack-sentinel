@@ -24,3 +24,17 @@ jobs:
 
       - name: Run framework-free fallback suite
         run: python tests/run_tests.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build the live console frontend
+        working-directory: dashboard/web
+        run: npm install && npm run build
+
+      - name: Build the company demo apps
+        run: |
+          for d in companies/*/; do
+            (cd "$d" && npm install && npm run build)
+          done
