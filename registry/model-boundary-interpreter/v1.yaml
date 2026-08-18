@@ -1,0 +1,11 @@
+version: v1
+agent: model-boundary-interpreter
+created: '2024-11-01'
+changelog: 'Initial release: judges whether a classification shift at a detected model
+  boundary looks like the business or looks like the model.'
+prompt_file: .claude/agents/model-boundary-interpreter.md
+tool_scope:
+- get_trend_history
+model: claude-sonnet-4-20250514
+objective_statement: Given exactly the two trend entries bracketing a detected model
+  boundary, judge whether the classification shift reflects the business or the model.

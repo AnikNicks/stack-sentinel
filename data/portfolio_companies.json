@@ -1,0 +1,64 @@
+{
+  "companies": [
+    {
+      "company_id": "northwind",
+      "name": "Northwind Logistics Group",
+      "relationship_type": "PE",
+      "sector": "Regional trucking / logistics roll-up",
+      "close_date": "2024-11-01",
+      "investment_thesis": {
+        "summary": "Roll-up of 4 regional less-than-truckload carriers. Value creation via route-density consolidation and disciplined fuel-surcharge pass-through pricing, underwritten to expand EBITDA margin from a ~12% entry level to ~18% by year 3 of the hold.",
+        "underwritten_kpis": {
+          "ebitda_margin_pct": {"entry": 12.0, "year_1_target": 15.0, "year_3_target": 18.0},
+          "revenue_growth_pct_yoy": {"target_range": [6.0, 10.0]},
+          "customer_retention_pct": {"target_min": 90.0}
+        },
+        "key_risks_at_underwriting": [
+          "Fuel cost volatility compressing margin quarter-to-quarter",
+          "Integration risk across 4 legacy route networks",
+          "Customer concentration in top-10 shippers"
+        ]
+      }
+    },
+    {
+      "company_id": "solace",
+      "name": "Solace Behavioral Health",
+      "relationship_type": "PE",
+      "sector": "Outpatient mental-health clinic roll-up",
+      "close_date": "2024-12-01",
+      "investment_thesis": {
+        "summary": "De novo clinic expansion (target 6 new sites over the hold) combined with payor-mix improvement (shifting toward commercial/in-network reimbursement) driving same-store revenue growth toward the underwritten case.",
+        "underwritten_kpis": {
+          "same_store_revenue_growth_pct_yoy": {"target_range": [7.0, 11.0]},
+          "new_clinics_opened_cumulative": {"year_1_target": 2, "year_2_target": 4, "year_3_target": 6},
+          "commercial_payor_mix_pct": {"entry": 55.0, "year_2_target": 68.0}
+        },
+        "key_risks_at_underwriting": [
+          "De novo clinic ramp slower than underwritten",
+          "Payor contract renegotiation risk",
+          "Clinician staffing/retention in a tight labor market"
+        ]
+      }
+    },
+    {
+      "company_id": "ferrous_point",
+      "name": "Ferrous Point Industrial Supply",
+      "relationship_type": "PD",
+      "sector": "Industrial distribution (fasteners, fabricated metal components)",
+      "close_date": "2024-10-15",
+      "loan_agreement": {
+        "summary": "Senior secured term loan supporting a dividend recapitalization. Financial covenant package centers on a Total Net Leverage ratio test, tested quarterly.",
+        "covenants": {
+          "total_net_leverage": {
+            "compliant_below": 4.0,
+            "warning_at_or_above": 4.0,
+            "breach_at_or_above": 4.5,
+            "definition": "Total Net Debt / Trailing Twelve Month Adjusted EBITDA"
+          },
+          "minimum_liquidity_usd": 2000000
+        },
+        "reporting_frequency": "Quarterly, within 30 days of quarter-end"
+      }
+    }
+  ]
+}

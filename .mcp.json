@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "portfolio-pulse": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "mcp",
+        "gateway",
+        "run",
+        "--profile",
+        "portfolio-pulse"
+      ],
+      "env": {}
+    }
+  }
+}

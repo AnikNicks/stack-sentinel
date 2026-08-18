@@ -1,0 +1,13 @@
+{
+  "company_id": "northwind",
+  "quarters": {
+    "2025-Q1": {"ebitda_margin_pct": 14.5, "revenue_growth_pct_yoy": 7.2, "customer_retention_pct": 91.5, "fuel_cost_index": 101},
+    "2025-Q2": {"ebitda_margin_pct": 13.8, "revenue_growth_pct_yoy": 7.0, "customer_retention_pct": 91.0, "fuel_cost_index": 134, "note": "One-quarter regional diesel price spike; surcharge pass-through lags by contract terms one quarter."},
+    "2025-Q3": {"ebitda_margin_pct": 15.2, "revenue_growth_pct_yoy": 7.8, "customer_retention_pct": 91.8, "fuel_cost_index": 106},
+    "2025-Q4": {"ebitda_margin_pct": 15.9, "revenue_growth_pct_yoy": 8.1, "customer_retention_pct": 92.0, "fuel_cost_index": 103},
+    "2026-Q1": {"ebitda_margin_pct": 15.7, "revenue_growth_pct_yoy": 8.3, "customer_retention_pct": 92.2, "fuel_cost_index": 102, "note": "One-time terminal-lease ramp cost this quarter; small QoQ margin dip against an otherwise steady 3-quarter uptrend, underlying unit economics unchanged."},
+    "2026-Q2": {"ebitda_margin_pct": 16.9, "revenue_growth_pct_yoy": 8.6, "customer_retention_pct": 92.5, "fuel_cost_index": 99},
+    "2026-Q3": {"ebitda_margin_pct": 17.3, "revenue_growth_pct_yoy": 8.9, "customer_retention_pct": 92.8, "fuel_cost_index": 98},
+    "2026-Q4": {"ebitda_margin_pct": 17.8, "revenue_growth_pct_yoy": 9.1, "customer_retention_pct": 93.0, "fuel_cost_index": 97}
+  }
+}

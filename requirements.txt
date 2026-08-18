@@ -1,0 +1,6 @@
+PyYAML==6.0.3
+numpy==2.5.2
+pytest==9.1.1
+mcp==2.0.0
+chromadb==1.5.9
+requests==2.34.2

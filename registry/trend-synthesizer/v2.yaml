@@ -1,0 +1,13 @@
+version: v2
+agent: trend-synthesizer
+created: '2025-04-01'
+changelog: Compares each quarter's KPI against the trailing 3-quarter trend instead
+  of only the immediately prior quarter, before calling something an inflection. Reduces
+  false positives on short-lived, single-quarter cost or revenue noise (e.g. a one-quarter
+  input-cost spike) that v1 misread as thesis-breaking.
+prompt_file: .claude/agents/trend-synthesizer.md
+tool_scope:
+- get_trend_history
+model: claude-sonnet-4-20250514
+objective_statement: Judge whether this quarter's number is a genuine inflection or
+  normal noise, in the context of prior quarters.

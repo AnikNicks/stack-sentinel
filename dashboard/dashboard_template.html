@@ -1,0 +1,1382 @@
+<meta charset="utf-8" />
+<title>Portfolio Pulse — Monitoring Console</title>
+<style>
+  @font-face {
+    font-family: "PulseMono";
+    src: local("Cascadia Code"), local("SF Mono"), local("Consolas");
+  }
+
+  /* ---------- Design tokens ---------- */
+  :root {
+    --ink: #0C0F16;
+    --surface: #151B26;
+    --surface-2: #1D2532;
+    --surface-3: #262F3E;
+    --border: #2A3342;
+    --border-soft: #202836;
+    --text: #ECEFF4;
+    --text-muted: #8B93A7;
+    --text-faint: #5B6478;
+    --accent: #4C9FE0;
+    --accent-soft: rgba(76, 159, 224, 0.14);
+    --accent-text: #8CC4EE;
+
+    --good: #0ca30c;
+    --good-text: #4FD16A;
+    --warning: #fab219;
+    --warning-text: #F5C451;
+    --serious: #ec835a;
+    --serious-text: #F09A78;
+    --critical: #d03b3b;
+    --critical-text: #EF6B63;
+
+    /* Per-company identity colors — stable per company, independent of status
+       severity colors above, so a chart/badge/legend swatch is recognizable at a
+       glance without reading text. */
+    --company-northwind: #4C9FE0;
+    --company-solace: #D66BC0;
+    --company-ferrous_point: #3FBFA0;
+
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.28);
+    --radius: 10px;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ink: #F3F4F7;
+      --surface: #FFFFFF;
+      --surface-2: #EDEFF3;
+      --surface-3: #E3E6EC;
+      --border: #DBDFE6;
+      --border-soft: #E6E9EE;
+      --text: #191D26;
+      --text-muted: #5A6172;
+      --text-faint: #848CA0;
+      --accent: #1D6FA8;
+      --accent-soft: rgba(29, 111, 168, 0.10);
+      --accent-text: #1D6FA8;
+
+      --good-text: #0ca30c;
+      --warning-text: #9A6A00;
+      --serious-text: #C1552C;
+      --critical-text: #B23028;
+
+      --company-northwind: #1D6FA8;
+      --company-solace: #A83D95;
+      --company-ferrous_point: #0E8074;
+
+      --shadow: 0 1px 2px rgba(20,24,32,0.06), 0 8px 24px rgba(20,24,32,0.08);
+    }
+  }
+
+  :root[data-theme="light"] {
+    --ink: #F3F4F7;
+    --surface: #FFFFFF;
+    --surface-2: #EDEFF3;
+    --surface-3: #E3E6EC;
+    --border: #DBDFE6;
+    --border-soft: #E6E9EE;
+    --text: #191D26;
+    --text-muted: #5A6172;
+    --text-faint: #848CA0;
+    --accent: #1D6FA8;
+    --accent-soft: rgba(29, 111, 168, 0.10);
+    --accent-text: #1D6FA8;
+
+    --good-text: #0ca30c;
+    --warning-text: #9A6A00;
+    --serious-text: #C1552C;
+    --critical-text: #B23028;
+
+    --company-northwind: #1D6FA8;
+    --company-solace: #A83D95;
+    --company-ferrous_point: #0E8074;
+
+    --shadow: 0 1px 2px rgba(20,24,32,0.06), 0 8px 24px rgba(20,24,32,0.08);
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #0C0F16;
+    --surface: #151B26;
+    --surface-2: #1D2532;
+    --surface-3: #262F3E;
+    --border: #2A3342;
+    --border-soft: #202836;
+    --text: #ECEFF4;
+    --text-muted: #8B93A7;
+    --text-faint: #5B6478;
+    --accent: #4C9FE0;
+    --accent-soft: rgba(76, 159, 224, 0.14);
+    --accent-text: #8CC4EE;
+    --good-text: #4FD16A;
+    --warning-text: #F5C451;
+    --serious-text: #F09A78;
+    --critical-text: #EF6B63;
+
+    --company-northwind: #4C9FE0;
+    --company-solace: #D66BC0;
+    --company-ferrous_point: #3FBFA0;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: "PulseMono", ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  a { color: var(--accent-text); }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+
+  /* ---------- Header ---------- */
+  header.top {
+    border-bottom: 1px solid var(--border-soft);
+    background: linear-gradient(180deg, var(--surface) 0%, var(--ink) 100%);
+  }
+  .top-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .brand-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-weight: 600;
+    margin: 0 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pulse-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .55; transform: scale(0.82); }
+  }
+  h1.brand {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .top-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .badge.mode-dry { color: var(--warning-text); border-color: color-mix(in srgb, var(--warning) 40%, var(--border)); }
+  .badge.mode-live { color: var(--good-text); border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
+  .theme-toggle {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .theme-toggle:hover { color: var(--text); }
+
+  /* ---------- Sections ---------- */
+  section { margin-top: 44px; }
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 16px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .section-eyebrow {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-faint);
+  }
+  h2.section-title {
+    margin: 2px 0 0;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  p.section-note { margin: 0; font-size: 13px; color: var(--text-muted); max-width: 46ch; text-align: right; }
+
+  /* ---------- Overview cards ---------- */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  @media (max-width: 900px) { .overview-grid { grid-template-columns: 1fr; } }
+
+  .company-card {
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+    padding: 18px 18px 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .company-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .company-name { font-size: 15.5px; font-weight: 700; margin: 0 0 3px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 7px; }
+  .company-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px var(--surface); }
+  .company-sub { font-size: 12px; color: var(--text-muted); }
+  .rel-badge {
+    font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 3px 7px; border-radius: 5px;
+    background: var(--surface-3); color: var(--text-muted);
+    flex: none;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid transparent;
+    width: fit-content;
+  }
+  .status-pill .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .status-good { color: var(--good-text); background: color-mix(in srgb, var(--good) 14%, transparent); }
+  .status-good .dot { background: var(--good); }
+  .status-warning { color: var(--warning-text); background: color-mix(in srgb, var(--warning) 16%, transparent); }
+  .status-warning .dot { background: var(--warning); }
+  .status-critical { color: var(--critical-text); background: color-mix(in srgb, var(--critical) 14%, transparent); }
+  .status-critical .dot { background: var(--critical); }
+  .status-neutral { color: var(--text-muted); background: var(--surface-2); }
+  .status-neutral .dot { background: var(--text-faint); }
+
+  .readout { display: flex; align-items: baseline; gap: 8px; }
+  .readout-value { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .readout-label { font-size: 11.5px; color: var(--text-muted); }
+
+  .spark-wrap { margin-top: 2px; }
+  .spark-foot { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-faint); margin-top: 2px; }
+
+  /* ---------- Version rail ---------- */
+  .rail-card {
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius);
+    padding: 22px 22px 18px; box-shadow: var(--shadow);
+  }
+  .rail-track { position: relative; padding: 30px 6px 8px; overflow-x: auto; }
+  .rail-line { position: absolute; left: 6px; right: 6px; top: 46px; height: 2px; background: var(--border); }
+  .rail-events { display: flex; justify-content: space-between; position: relative; gap: 8px; min-width: 620px; }
+  .rail-event { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+  .rail-marker {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--accent);
+    z-index: 1; margin-top: 39px;
+  }
+  .rail-marker.rollback { border-color: var(--critical); background: var(--critical); box-shadow: 0 0 0 4px color-mix(in srgb, var(--critical) 22%, transparent); }
+  .rail-marker.improve { border-color: var(--good); background: var(--good); }
+  .rail-label-top { font-size: 11px; color: var(--text-muted); text-align: center; max-width: 15ch; }
+  .rail-label-top .v { font-weight: 700; color: var(--text); font-size: 13px; }
+  .rail-label-bottom { font-size: 10.5px; color: var(--text-faint); margin-top: 8px; text-align: center; max-width: 17ch; }
+
+  /* ---------- Trend charts ---------- */
+  .trend-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .trend-card {
+    background: var(--surface); border: 1px solid var(--border-soft); border-left: 3px solid var(--card-accent, var(--accent)); border-radius: var(--radius);
+    padding: 18px 20px 18px 18px; box-shadow: var(--shadow); display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 20px; align-items: center;
+  }
+  @media (max-width: 760px) { .trend-card { grid-template-columns: minmax(0, 1fr); } }
+  .trend-meta { min-width: 0; }
+  .trend-meta-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .trend-meta .company-name { margin-bottom: 0; }
+  .trend-meta .company-sub { margin: 8px 0 0; }
+  .trend-legend { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+  .legend-swatch { width: 9px; height: 9px; border-radius: 50%; }
+  .chart-svg-wrap { position: relative; min-width: 0; width: 100%; overflow: visible; }
+  .chart-svg-wrap svg { width: 100%; height: auto; display: block; }
+  .chart-tooltip {
+    position: absolute; pointer-events: none; z-index: 5;
+    background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 11.5px; box-shadow: var(--shadow);
+    max-width: 300px; opacity: 0; transition: opacity .1s;
+    transform: translate(-50%, -110%);
+  }
+  .chart-tooltip.show { opacity: 1; }
+  .chart-tooltip .tt-q { font-weight: 700; margin-bottom: 2px; }
+  .chart-tooltip .tt-v { color: var(--accent-text); font-weight: 700; }
+  .chart-tooltip .tt-r { color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+
+  /* ---------- Clickable figures: hover preview + full-detail modal ---------- */
+  .clickable-figure {
+    cursor: pointer; border-radius: 8px; padding: 4px 7px; margin: -4px -7px;
+    transition: background .12s; -webkit-tap-highlight-color: transparent;
+  }
+  .clickable-figure:hover, .clickable-figure:focus-visible { background: var(--surface-2); }
+  .figure-hint {
+    display: block; font-size: 10px; font-weight: 600; color: var(--accent-text);
+    opacity: 0; transition: opacity .12s; margin-top: 3px;
+  }
+  .clickable-figure:hover .figure-hint, .clickable-figure:focus-visible .figure-hint { opacity: 1; }
+
+  .rail-marker { cursor: pointer; transition: box-shadow .12s, transform .12s; }
+  .rail-marker:hover, .rail-marker:focus-visible { transform: scale(1.15); box-shadow: 0 0 0 4px var(--accent-soft); }
+
+  .incident-row { cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+  .incident-row:hover, .incident-row:focus-visible { border-color: var(--accent); }
+  .incident-row:hover .figure-hint, .incident-row:focus-visible .figure-hint { opacity: 1; }
+
+  .pulse-hover-tip {
+    position: fixed; pointer-events: none; z-index: 90;
+    background: var(--surface-3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; font-size: 11.5px; line-height: 1.5; box-shadow: var(--shadow);
+    max-width: 280px; opacity: 0; transition: opacity .1s;
+  }
+  .pulse-hover-tip.show { opacity: 1; }
+
+  .pulse-modal-overlay {
+    position: fixed; inset: 0; background: rgba(6, 9, 15, 0.6);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    z-index: 100; opacity: 0; pointer-events: none; transition: opacity .15s;
+  }
+  .pulse-modal-overlay.show { opacity: 1; pointer-events: auto; }
+  .pulse-modal {
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius);
+    box-shadow: var(--shadow); max-width: 560px; width: 100%; max-height: 82vh; overflow-y: auto;
+    padding: 22px 24px 24px; position: relative; transform: translateY(10px); transition: transform .15s;
+  }
+  .pulse-modal-overlay.show .pulse-modal { transform: translateY(0); }
+  .pulse-modal-close {
+    position: absolute; top: 14px; right: 14px; background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-muted); width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    font-size: 13px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .pulse-modal-close:hover { color: var(--text); border-color: var(--text-faint); }
+  .pulse-modal-eyebrow { text-transform: uppercase; letter-spacing: 0.1em; font-size: 10.5px; color: var(--text-faint); font-weight: 700; margin: 0 0 5px; }
+  .pulse-modal-title { font-size: 18px; font-weight: 750; margin: 0 0 16px; padding-right: 34px; letter-spacing: -0.01em; }
+  .pulse-modal-section { margin-top: 16px; }
+  .pulse-modal-section:first-of-type { margin-top: 0; }
+  .pulse-modal-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); font-weight: 700; margin: 0 0 7px; }
+  .pulse-modal-body-text { font-size: 13.5px; line-height: 1.6; color: var(--text); margin: 0; white-space: pre-line; }
+  .pulse-metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pulse-metric-cell { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 9px 11px; }
+  .pulse-metric-cell .v { font-size: 15.5px; font-weight: 700; }
+  .pulse-metric-cell .l { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
+  .pulse-agent-card { background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 12px; margin-top: 8px; }
+  .pulse-agent-card:first-child { margin-top: 0; }
+  .pulse-agent-card .a-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 700; flex-wrap: wrap; }
+  .pulse-agent-card .a-tag { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .pulse-agent-card .a-body { font-size: 12.5px; color: var(--text-muted); margin-top: 5px; line-height: 1.5; }
+
+  /* ---------- Incident log ---------- */
+  .incident-list { display: flex; flex-direction: column; gap: 10px; }
+  .incident-row {
+    display: grid; grid-template-columns: 4px 1fr auto; gap: 14px; align-items: stretch;
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius);
+    overflow: hidden; box-shadow: var(--shadow);
+  }
+  .incident-stripe { background: var(--text-faint); }
+  .incident-stripe.critical { background: var(--critical); }
+  .incident-stripe.high { background: var(--serious); }
+  .incident-body { padding: 14px 4px 14px 0; }
+  .incident-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+  .incident-id { font-weight: 700; font-size: 13px; }
+  .incident-kind { font-size: 12px; color: var(--text-muted); }
+  .incident-detail { font-size: 13px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+  .incident-side { padding: 14px 18px 14px 0; text-align: right; display: flex; flex-direction: column; gap: 6px; justify-content: center; align-items: flex-end; min-width: 150px; }
+  .incident-quarter { font-size: 12px; color: var(--text-faint); }
+
+  /* ---------- Notification log ---------- */
+  .table-card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  table.notif-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.notif-table th {
+    text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-faint); font-weight: 700; padding: 10px 16px; border-bottom: 1px solid var(--border-soft);
+    background: var(--surface-2);
+  }
+  table.notif-table td { padding: 10px 16px; border-bottom: 1px solid var(--border-soft); color: var(--text-muted); vertical-align: top; }
+  table.notif-table tr:last-child td { border-bottom: none; }
+  table.notif-table td.chan { color: var(--text); font-weight: 600; }
+  .chan-icon { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 6px; background: var(--accent); }
+  .table-scroll { overflow-x: auto; }
+  .status-chip { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .status-chip.dry_run { background: var(--surface-3); color: var(--text-muted); }
+  .status-chip.sent { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good-text); }
+  .status-chip.error { background: color-mix(in srgb, var(--critical) 16%, transparent); color: var(--critical-text); }
+
+  /* ---------- Ask console ---------- */
+  .ask-card {
+    background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius);
+    padding: 20px 22px 22px; box-shadow: var(--shadow);
+  }
+  .ask-form { display: flex; gap: 10px; }
+  .ask-input {
+    flex: 1; background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 11px 14px; font-size: 14px; font-family: inherit;
+  }
+  .ask-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .ask-submit {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 0 20px;
+    font-weight: 700; font-size: 13px; cursor: pointer;
+  }
+  .ask-submit:hover { filter: brightness(1.08); }
+  .ask-chips { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .ask-chip {
+    font-size: 12px; color: var(--text-muted); background: var(--surface-2); border: 1px solid var(--border-soft);
+    padding: 5px 10px; border-radius: 999px; cursor: pointer;
+  }
+  .ask-chip:hover { color: var(--text); border-color: var(--border); }
+  .ask-answer { margin-top: 18px; border-top: 1px solid var(--border-soft); padding-top: 16px; display: none; }
+  .ask-answer.show { display: block; }
+  .ask-answer-q { font-size: 12px; color: var(--text-faint); margin-bottom: 8px; }
+  .ask-answer-body { font-size: 14px; line-height: 1.65; white-space: pre-line; }
+  .ask-cite { display: inline-block; margin-top: 10px; font-size: 11.5px; color: var(--accent-text); background: var(--accent-soft); padding: 3px 8px; border-radius: 6px; margin-right: 6px; }
+  .ask-note { font-size: 11.5px; color: var(--text-faint); margin-top: 14px; }
+
+  footer.pulse-footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border-soft); font-size: 12px; color: var(--text-faint); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div>
+      <p class="brand-eyebrow"><span class="pulse-dot" aria-hidden="true"></span>Continuous portfolio monitoring console</p>
+      <h1 class="brand">Portfolio Pulse</h1>
+    </div>
+    <div class="top-meta">
+      <span class="badge" id="quarter-range-badge">—</span>
+      <span class="badge" id="mode-badge">—</span>
+      <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle color theme">Theme</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section id="overview">
+    <div class="section-head">
+      <div>
+        <p class="section-eyebrow">Portfolio overview</p>
+        <h2 class="section-title">Current status, 3 companies</h2>
+      </div>
+      <p class="section-note">Latest recorded classification per company, from the real trend store. Click a metric for the full explanation.</p>
+    </div>
+    <div class="overview-grid" id="overview-grid"></div>
+  </section>
+
+  <section id="version-rail">
+    <div class="section-head">
+      <div>
+        <p class="section-eyebrow">Registry &amp; rollback</p>
+        <h2 class="section-title">trend-synthesizer version history</h2>
+      </div>
+      <p class="section-note">Real activation_log.jsonl — a version improvement, a regression, and an automatic rollback.</p>
+    </div>
+    <div class="rail-card">
+      <div class="rail-track"><div class="rail-line" aria-hidden="true"></div>
+        <div class="rail-events" id="rail-events"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trends">
+    <div class="section-head">
+      <div>
+        <p class="section-eyebrow">Longitudinal record</p>
+        <h2 class="section-title">Per-company trend, 8 quarters</h2>
+      </div>
+      <p class="section-note">Amber/red points mark a flagged quarter. Hover any point or figure for a preview, click for the full explanation.</p>
+    </div>
+    <div class="trend-grid" id="trend-grid"></div>
+  </section>
+
+  <section id="incidents">
+    <div class="section-head">
+      <div>
+        <p class="section-eyebrow">Replay bundles</p>
+        <h2 class="section-title">Incident log</h2>
+      </div>
+      <p class="section-note">Every flagged event this run, real routing and resolution status.</p>
+    </div>
+    <div class="incident-list" id="incident-list"></div>
+  </section>
+
+  <section id="notifications">
+    <div class="section-head">
+      <div>
+        <p class="section-eyebrow">Dispatch record</p>
+        <h2 class="section-title">Notification log</h2>
+      </div>
+      <p class="section-note">Every real/dry-run send this run, from notifications_log.jsonl.</p>
+    </div>
+    <div class="table-card">
+      <div class="table-scroll">
+        <table class="notif-table" id="notif-table">
+          <thead><tr><th>Channel</th><th>Purpose</th><th>Target</th><th>Status</th><th>Incident</th><th>Timestamp</th></tr></thead>
+          <tbody id="notif-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section id="ask">
+    <div class="section-head">
+      <div>
+        <p class="section-eyebrow">Grounded query</p>
+        <h2 class="section-title">Ask Portfolio Pulse</h2>
+      </div>
+      <p class="section-note">Deterministic search over this run's real data — never a live model call. See answer below for why.</p>
+    </div>
+    <div class="ask-card">
+      <form class="ask-form" id="ask-form">
+        <label class="visually-hidden" for="ask-input">Ask a question about this run</label>
+        <input class="ask-input mono" id="ask-input" type="text" autocomplete="off"
+               placeholder="e.g. why was solace flagged in 2026 q1?" />
+        <button class="ask-submit" type="submit">Ask</button>
+      </form>
+      <div class="ask-chips" id="ask-chips"></div>
+      <div class="ask-answer" id="ask-answer">
+        <div class="ask-answer-q" id="ask-answer-q"></div>
+        <div class="ask-answer-body" id="ask-answer-body"></div>
+        <div id="ask-answer-cites"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="pulse-footer">
+    <span>Portfolio Pulse — deterministic core, single-shot classifiers. See CLAUDE.md.</span>
+    <span id="generated-at"></span>
+  </footer>
+</div>
+
+<div class="pulse-modal-overlay" id="pulse-modal-overlay" role="presentation">
+  <div class="pulse-modal" role="dialog" aria-modal="true" aria-labelledby="pulse-modal-title">
+    <button class="pulse-modal-close" type="button" id="pulse-modal-close" aria-label="Close">✕</button>
+    <p class="pulse-modal-eyebrow" id="pulse-modal-eyebrow"></p>
+    <h3 class="pulse-modal-title" id="pulse-modal-title"></h3>
+    <div id="pulse-modal-content"></div>
+  </div>
+</div>
+<div class="pulse-hover-tip mono" id="pulse-hover-tip" role="tooltip" aria-hidden="true"></div>
+
+<script id="pulse-data-raw" type="application/json">__PULSE_DATA_SNAPSHOT__</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var DATA = JSON.parse(document.getElementById("pulse-data-raw").textContent);
+
+  var THEME_KEY = "pulse-theme";
+  var root = document.documentElement;
+  function applyStoredTheme() {
+    var stored = null;
+    try { stored = localStorage.getItem(THEME_KEY); } catch (e) {}
+    if (stored === "light" || stored === "dark") root.setAttribute("data-theme", stored);
+  }
+  applyStoredTheme();
+  document.getElementById("theme-toggle").addEventListener("click", function () {
+    var current = root.getAttribute("data-theme");
+    var next = current === "dark" ? "light" : (current === "light" ? null : (matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark"));
+    if (next) { root.setAttribute("data-theme", next); } else { root.removeAttribute("data-theme"); }
+    try { if (next) localStorage.setItem(THEME_KEY, next); else localStorage.removeItem(THEME_KEY); } catch (e) {}
+  });
+
+  var COMPANY_META = {
+    northwind: { metric: "ebitda_margin_pct", unit: "%", label: "EBITDA margin", flaggedWhen: "off_thesis", color: "var(--company-northwind)" },
+    solace: { metric: "same_store_revenue_growth_pct_yoy", unit: "%", label: "Same-store revenue growth", flaggedWhen: "off_thesis", color: "var(--company-solace)" },
+    ferrous_point: { metric: "total_net_leverage", unit: "x", label: "Total net leverage", flaggedWhen: "warning", color: "var(--company-ferrous_point)" }
+  };
+
+  var STATUS_CLASS = {
+    on_thesis: "status-good", compliant: "status-good",
+    watch: "status-warning", warning: "status-warning",
+    off_thesis: "status-critical", breach: "status-critical",
+    assessment_failed: "status-neutral"
+  };
+
+  function fmtQuarter(q) { return q; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]; }); }
+  function titleCase(s) { return String(s).replace(/_/g, " ").replace(/\b\w/g, function (c) { return c.toUpperCase(); }); }
+
+  // ---------------- Full-detail modal (click a figure for the complete explanation) ----------------
+  var modalOverlay = document.getElementById("pulse-modal-overlay");
+  var modalEyebrow = document.getElementById("pulse-modal-eyebrow");
+  var modalTitle = document.getElementById("pulse-modal-title");
+  var modalContent = document.getElementById("pulse-modal-content");
+  var modalCloseBtn = document.getElementById("pulse-modal-close");
+  var modalLastFocused = null;
+
+  function openModal(eyebrow, title, contentHtml) {
+    modalLastFocused = document.activeElement;
+    modalEyebrow.textContent = eyebrow;
+    modalTitle.textContent = title;
+    modalContent.innerHTML = contentHtml;
+    modalOverlay.classList.add("show");
+    modalCloseBtn.focus();
+    document.addEventListener("keydown", onModalKeydown);
+  }
+  function closeModal() {
+    modalOverlay.classList.remove("show");
+    document.removeEventListener("keydown", onModalKeydown);
+    if (modalLastFocused && typeof modalLastFocused.focus === "function") modalLastFocused.focus();
+  }
+  function onModalKeydown(e) { if (e.key === "Escape") closeModal(); }
+  modalCloseBtn.addEventListener("click", closeModal);
+  modalOverlay.addEventListener("click", function (e) { if (e.target === modalOverlay) closeModal(); });
+
+  function makeClickable(el, onActivate) {
+    el.setAttribute("tabindex", "0");
+    el.setAttribute("role", "button");
+    el.addEventListener("click", onActivate);
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onActivate(e); }
+    });
+  }
+
+  // ---------------- Shared hover-preview tooltip (plain HTML elements, not SVG) ----------------
+  var hoverTip = document.getElementById("pulse-hover-tip");
+  function showHoverTip(clientX, clientY, html) {
+    hoverTip.innerHTML = html;
+    hoverTip.classList.add("show");
+    var w = hoverTip.offsetWidth, h = hoverTip.offsetHeight;
+    var left = Math.min(Math.max(clientX - w / 2, 8), window.innerWidth - w - 8);
+    var top = clientY - h - 16;
+    if (top < 8) top = clientY + 20;
+    hoverTip.style.left = left + "px";
+    hoverTip.style.top = top + "px";
+  }
+  function hideHoverTip() { hoverTip.classList.remove("show"); }
+  function attachHoverTip(el, htmlFn) {
+    el.addEventListener("mousemove", function (e) { showHoverTip(e.clientX, e.clientY, htmlFn()); });
+    el.addEventListener("mouseleave", hideHoverTip);
+    el.addEventListener("focus", function () {
+      var r = el.getBoundingClientRect();
+      showHoverTip(r.left + r.width / 2, r.top, htmlFn());
+    });
+    el.addEventListener("blur", hideHoverTip);
+  }
+
+  // ---------------- Metric formatting (used by the full-detail modal) ----------------
+  var ACRONYMS = { Ebitda: "EBITDA", Ttm: "TTM", Yoy: "YoY", Usd: "USD" };
+  function formatMetricLabel(key) {
+    var label = titleCase(key.replace(/_pct_yoy$/, " (% yoy)").replace(/_pct$/, " (%)").replace(/_usd$/, " ($)"));
+    return label.replace(/\b(Ebitda|Ttm|Yoy|Usd)\b/g, function (w) { return ACRONYMS[w]; });
+  }
+  function formatMetricValue(key, value) {
+    if (typeof value === "string") return value;
+    if (/_usd$/.test(key)) return "$" + Math.round(value).toLocaleString("en-US");
+    if (/_pct/.test(key)) return value + "%";
+    if (key === "total_net_leverage") return value + "x";
+    return String(value);
+  }
+
+  // ---------------- Full-detail content builders ----------------
+  function entryModalHtml(company, entry) {
+    var statusClass = STATUS_CLASS[entry.classification] || "status-neutral";
+    var metricKeys = Object.keys(entry.metric_snapshot || {});
+    var numKeys = metricKeys.filter(function (k) { return typeof entry.metric_snapshot[k] !== "string"; });
+    var textKeys = metricKeys.filter(function (k) { return typeof entry.metric_snapshot[k] === "string"; });
+
+    var metricsHtml = numKeys.length ? '<div class="pulse-metric-grid">' + numKeys.map(function (k) {
+      return '<div class="pulse-metric-cell"><div class="v mono">' + esc(formatMetricValue(k, entry.metric_snapshot[k])) + '</div><div class="l">' + esc(formatMetricLabel(k)) + '</div></div>';
+    }).join("") + '</div>' : "";
+    var noteHtml = textKeys.map(function (k) {
+      return '<p class="pulse-modal-body-text" style="margin-top:10px;font-style:italic;color:var(--text-muted)">' + esc(entry.metric_snapshot[k]) + '</p>';
+    }).join("");
+
+    var agentsHtml = (entry.contributing_assessments || []).map(function (a) {
+      var tag = a.raw_classification ? a.raw_classification.replace(/_/g, " ") : (a.read ? a.read : (a.trajectory ? "trajectory: " + a.trajectory : ""));
+      return '<div class="pulse-agent-card">' +
+        '<div class="a-head"><span>' + esc(a.agent) + ' ' + esc(a.version) + '</span>' + (tag ? '<span class="a-tag mono">' + esc(tag) + '</span>' : '') + '</div>' +
+        (a.model ? '<div style="font-size:11px;color:var(--text-faint);margin-top:2px" class="mono">' + esc(a.model) + '</div>' : '') +
+        '<div class="a-body">' + esc(a.rationale || "") + '</div>' +
+      '</div>';
+    }).join("");
+
+    var relatedIncident = DATA.incidents.filter(function (i) { return (i.company_ids || []).indexOf(company.company_id) !== -1 && i.detected_at === entry.quarter; })[0];
+
+    return (
+      '<div class="pulse-modal-section">' +
+        '<span class="status-pill ' + statusClass + '"><span class="dot"></span>' + esc(entry.classification.replace(/_/g, " ")) + '</span>' +
+        '<span class="mono" style="font-size:11.5px;color:var(--text-faint);margin-left:10px">classified by ' + esc(entry.classifying_agent) + ' ' + esc(entry.agent_version) + ' · ' + esc(entry.model) + '</span>' +
+      '</div>' +
+      '<div class="pulse-modal-section"><p class="pulse-modal-label">Full rationale</p><p class="pulse-modal-body-text">' + esc(entry.rationale || "") + '</p></div>' +
+      (metricsHtml ? '<div class="pulse-modal-section"><p class="pulse-modal-label">All metrics this quarter</p>' + metricsHtml + noteHtml + '</div>' : noteHtml) +
+      (agentsHtml ? '<div class="pulse-modal-section"><p class="pulse-modal-label">Contributing assessments</p>' + agentsHtml + '</div>' : '') +
+      (relatedIncident ? '<div class="pulse-modal-section"><p class="pulse-modal-label">Linked incident</p><p class="pulse-modal-body-text">' + esc(relatedIncident.incident_id) + ' — ' + esc(relatedIncident.kind.replace(/_/g, " ")) + ' (' + esc(relatedIncident.status.replace(/_/g, " ")) + ')</p></div>' : '') +
+      '<div class="pulse-modal-section"><p class="pulse-modal-label">Recorded</p><p class="pulse-modal-body-text mono" style="color:var(--text-faint);font-size:12px">' + esc((entry.recorded_at || "").replace("T", " ").slice(0, 19)) + ' UTC</p></div>'
+    );
+  }
+  function openEntryModal(company, entry) {
+    openModal(company.name + " · " + entry.quarter, titleCase(entry.classification), entryModalHtml(company, entry));
+  }
+
+  function incidentModalHtml(inc) {
+    var statusClass = (inc.status === "auto_resolved" || inc.status === "reviewed") ? "status-good" : "status-warning";
+    var riskClass = inc.risk_tier === "critical" ? "status-critical" : "status-warning";
+    var html = '<div class="pulse-modal-section">' +
+      '<span class="status-pill ' + riskClass + '"><span class="dot"></span>' + esc(inc.risk_tier) + ' risk</span> ' +
+      '<span class="status-pill ' + statusClass + '"><span class="dot"></span>' + esc(inc.status.replace(/_/g, " ")) + '</span>' +
+    '</div>';
+    html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Remediation detail</p><p class="pulse-modal-body-text">' + esc(inc.remediation_detail || "—") + '</p></div>';
+    html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Routing</p><p class="pulse-modal-body-text">' + esc(inc.routing.replace(/_/g, " ")) + '</p></div>';
+    if (inc.company_ids && inc.company_ids.length) html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Companies</p><p class="pulse-modal-body-text">' + esc(inc.company_ids.join(", ")) + '</p></div>';
+    if (inc.human_note) html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Human review (' + esc(inc.resolved_by || "unknown") + ')</p><p class="pulse-modal-body-text">' + esc(inc.human_note) + '</p></div>';
+    if (inc.counterfactual) html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Counterfactual</p><p class="pulse-modal-body-text">' + esc(typeof inc.counterfactual === "string" ? inc.counterfactual : JSON.stringify(inc.counterfactual)) + '</p></div>';
+    if (inc.escalation_log && inc.escalation_log.length) {
+      html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Escalation log</p>' + inc.escalation_log.map(function (e) {
+        return '<p class="pulse-modal-body-text" style="margin-top:4px">' + esc(e.escalated_at) + ' → <b>' + esc(e.new_risk_tier) + '</b>: ' + esc(e.reason) + '</p>';
+      }).join("") + '</div>';
+    }
+    html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Detected / agent</p><p class="pulse-modal-body-text mono" style="font-size:12px;color:var(--text-faint)">' + esc(inc.detected_at) + (inc.agent_version ? ' · ' + esc(inc.agent_version) : '') + (inc.model ? ' · ' + esc(inc.model) : '') + '</p></div>';
+    return html;
+  }
+  function openIncidentModal(inc) {
+    openModal("Incident · " + inc.incident_id, titleCase(inc.kind), incidentModalHtml(inc));
+  }
+
+  function railModalHtml(ev, versionInfo) {
+    var html = '<div class="pulse-modal-section"><p class="pulse-modal-label">Activation reason</p><p class="pulse-modal-body-text">' + esc(ev.reason || "—") + '</p></div>';
+    html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Activated</p><p class="pulse-modal-body-text mono" style="font-size:12px;color:var(--text-faint)">' + esc((ev.activated_at || "").replace("T", " ").slice(0, 19)) + ' UTC · by ' + esc(ev.activated_by) + '</p></div>';
+    if (versionInfo) {
+      html += '<div class="pulse-modal-section"><p class="pulse-modal-label">' + esc(versionInfo.version) + ' changelog</p><p class="pulse-modal-body-text">' + esc(versionInfo.changelog || "—") + '</p></div>';
+      html += '<div class="pulse-modal-section"><p class="pulse-modal-label">Model</p><p class="pulse-modal-body-text mono" style="font-size:12px;color:var(--text-faint)">' + esc(versionInfo.model || "—") + '</p></div>';
+    }
+    return html;
+  }
+  function openRailModal(ev, versionInfo) {
+    openModal("trend-synthesizer · " + ev.active_version, "Activated by " + titleCase(ev.activated_by), railModalHtml(ev, versionInfo));
+  }
+
+  // ---------------- Header meta ----------------
+  var quarters = DATA.companies[0].trend_history.map(function (e) { return e.quarter; });
+  document.getElementById("quarter-range-badge").textContent = quarters[0] + " → " + quarters[quarters.length - 1];
+  var liveNote = DATA.notifications.length && DATA.notifications[0].live ? true : DATA.notifications.some(function(n){return n.live;});
+  var modeBadge = document.getElementById("mode-badge");
+  modeBadge.textContent = liveNote ? "LIVE run" : "DRY-RUN";
+  modeBadge.className = "badge " + (liveNote ? "mode-live" : "mode-dry");
+  document.getElementById("generated-at").textContent = "Generated from data_snapshot.json · " + DATA.companies.length + " companies · " + DATA.incidents.length + " incidents · " + DATA.notifications.length + " notifications";
+
+  // ---------------- Overview cards ----------------
+  function sparkline(values, w, h, colorVar) {
+    var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+    var range = (max - min) || 1;
+    var pad = 3;
+    var step = (w - pad * 2) / (values.length - 1);
+    var pts = values.map(function (v, i) {
+      var x = pad + i * step;
+      var y = h - pad - ((v - min) / range) * (h - pad * 2);
+      return [x, y];
+    });
+    var d = pts.map(function (p, i) { return (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+    var last = pts[pts.length - 1];
+    return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" aria-hidden="true">' +
+      '<path d="' + d + '" fill="none" stroke="' + colorVar + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />' +
+      '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="3" fill="' + colorVar + '" />' +
+      '</svg>';
+  }
+
+  var overviewGrid = document.getElementById("overview-grid");
+  DATA.companies.forEach(function (c) {
+    var meta = COMPANY_META[c.company_id];
+    var latest = c.trend_history[c.trend_history.length - 1];
+    var values = c.trend_history.map(function (e) { return e.metric_snapshot[meta.metric]; });
+    var statusClass = STATUS_CLASS[latest.classification] || "status-neutral";
+    var accentVar = statusClass === "status-critical" ? "var(--critical)" : (statusClass === "status-warning" ? "var(--warning)" : "var(--accent)");
+
+    var el = document.createElement("div");
+    el.className = "company-card";
+    el.innerHTML =
+      '<div class="company-card-head">' +
+        '<div><p class="company-name"><span class="company-dot" style="background:' + meta.color + '"></span>' + esc(c.name) + '</p><p class="company-sub">' + esc(latest.quarter) + '</p></div>' +
+        '<span class="rel-badge">' + esc(c.relationship_type) + '</span>' +
+      '</div>' +
+      '<span class="status-pill ' + statusClass + '"><span class="dot"></span>' + esc(latest.classification.replace(/_/g, " ")) + '</span>' +
+      '<div class="clickable-figure" id="readout-' + c.company_id + '" aria-haspopup="dialog" aria-label="Full detail for ' + esc(meta.label) + '">' +
+        '<div class="readout"><span class="readout-value mono">' + values[values.length - 1] + meta.unit + '</span><span class="readout-label">' + meta.label + '</span></div>' +
+        '<span class="figure-hint">Click for full detail →</span>' +
+      '</div>' +
+      '<div class="spark-wrap">' + sparkline(values, 220, 44, accentVar) +
+        '<div class="spark-foot mono"><span>' + c.trend_history[0].quarter + '</span><span>' + latest.quarter + '</span></div>' +
+      '</div>';
+    overviewGrid.appendChild(el);
+
+    var readoutEl = el.querySelector("#readout-" + c.company_id);
+    makeClickable(readoutEl, function () { openEntryModal(c, latest); });
+    attachHoverTip(readoutEl, function () {
+      return '<div style="font-weight:700;margin-bottom:2px">' + esc(latest.quarter) + '</div>' + esc(latest.rationale || "");
+    });
+  });
+
+  // ---------------- Version rail ----------------
+  var railEl = document.getElementById("rail-events");
+  var tsVersions = (DATA.registry["trend-synthesizer"] || {}).versions || [];
+  var tsHistory = (DATA.registry["trend-synthesizer"] || {}).activation_history || [];
+  tsHistory.forEach(function (ev, i) {
+    var isRollback = ev.activated_by === "pulse-auto-rollback";
+    var isImprovement = i === 1 && !isRollback;
+    var markerClass = isRollback ? "rollback" : (isImprovement ? "improve" : "");
+    var versionInfo = tsVersions.filter(function (v) { return v.version === ev.active_version; })[0];
+    var div = document.createElement("div");
+    div.className = "rail-event";
+    div.innerHTML =
+      '<div class="rail-label-top"><span class="v mono">' + esc(ev.active_version) + '</span><br>' + esc(ev.activated_by) + '</div>' +
+      '<div class="rail-marker ' + markerClass + '" aria-haspopup="dialog" aria-label="Full detail for ' + esc(ev.active_version) + ' activation"></div>' +
+      '<div class="rail-label-bottom">' + esc((ev.reason || "").split(" — ")[0].split(" - ")[0].slice(0, 70)) + '</div>';
+    railEl.appendChild(div);
+
+    var marker = div.querySelector(".rail-marker");
+    makeClickable(marker, function () { openRailModal(ev, versionInfo); });
+    attachHoverTip(marker, function () {
+      return '<div style="font-weight:700;margin-bottom:2px">' + esc(ev.active_version) + ' · ' + esc(ev.activated_by) + '</div>' + esc(ev.reason || "");
+    });
+  });
+
+  // ---------------- Trend charts ----------------
+  var trendGrid = document.getElementById("trend-grid");
+  var incidentQuarterByCompany = {};
+  DATA.incidents.forEach(function (inc) {
+    (inc.company_ids || []).forEach(function (cid) {
+      incidentQuarterByCompany[cid] = incidentQuarterByCompany[cid] || [];
+      incidentQuarterByCompany[cid].push(inc.detected_at);
+    });
+  });
+
+  function fmtQuarterShort(q) {
+    var m = String(q).match(/^(\d{4})-Q(\d)/);
+    if (!m) return q;
+    return "Q" + m[2] + " '" + m[1].slice(2);
+  }
+
+  function buildTrendChart(company) {
+    var meta = COMPANY_META[company.company_id];
+    var W = 640, H = 150, padL = 38, padR = 8, padT = 14, padB = 26;
+    var entries = company.trend_history.filter(function (e) { return e.classification !== "assessment_failed"; });
+    var values = entries.map(function (e) { return e.metric_snapshot[meta.metric]; });
+    var min = Math.min.apply(null, values), max = Math.max.apply(null, values);
+    var range = (max - min) || 1;
+    range = range * 1.25;
+    var mid = (max + min) / 2;
+    min = mid - range / 2; max = mid + range / 2;
+    var stepX = (W - padL - padR) / (entries.length - 1);
+
+    function xy(i, v) {
+      var x = padL + i * stepX;
+      var y = H - padB - ((v - min) / range) * (H - padT - padB);
+      return [x, y];
+    }
+
+    var linePts = entries.map(function (e, i) { return xy(i, e.metric_snapshot[meta.metric]); });
+    var lineD = linePts.map(function (p, i) { return (i === 0 ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+    var areaD = lineD + " L" + linePts[linePts.length - 1][0].toFixed(1) + "," + (H - padB) + " L" + linePts[0][0].toFixed(1) + "," + (H - padB) + " Z";
+
+    var gridSteps = [0, 0.5, 1];
+    var gridY = gridSteps.map(function (t) { return padT + t * (H - padT - padB); });
+    var gridLines = gridY.map(function (y) { return '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" stroke="var(--border-soft)" stroke-width="1" />'; }).join("");
+    var gridLabels = gridSteps.map(function (t, i) {
+      var v = max - t * range;
+      return '<text x="' + (padL - 6) + '" y="' + (gridY[i] + 3.5).toFixed(1) + '" text-anchor="end" font-size="9.5" fill="var(--text-faint)" class="mono">' + v.toFixed(1) + meta.unit + '</text>';
+    }).join("");
+    var xLabels = entries.map(function (e, i) {
+      var p = xy(i, e.metric_snapshot[meta.metric]);
+      var anchor = i === 0 ? "start" : (i === entries.length - 1 ? "end" : "middle");
+      return '<text x="' + p[0].toFixed(1) + '" y="' + (H - padB + 15) + '" text-anchor="' + anchor + '" font-size="9.5" fill="var(--text-faint)" class="mono">' + esc(fmtQuarterShort(e.quarter)) + '</text>';
+    }).join("");
+
+    var points = entries.map(function (e, i) {
+      var p = xy(i, e.metric_snapshot[meta.metric]);
+      var flagged = e.classification === meta.flaggedWhen;
+      var color = flagged ? "var(--critical)" : meta.color;
+      var isLast = i === entries.length - 1;
+      var r = isLast ? 5 : 4;
+      return '<circle class="pt" data-idx="' + i + '" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + r + '" fill="' + color + '" stroke="var(--surface)" stroke-width="2" style="cursor:pointer" />' +
+             '<circle class="hit" data-idx="' + i + '" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="10" fill="transparent" style="cursor:pointer" aria-haspopup="dialog" />';
+    }).join("");
+
+    var lastLabel = entries[entries.length - 1];
+    var lastP = linePts[linePts.length - 1];
+
+    var svg =
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="width:100%;height:150px;display:block" role="img" aria-label="' + esc(meta.label) + ' by quarter for ' + esc(company.name) + '">' +
+      gridLines +
+      gridLabels +
+      '<path d="' + areaD + '" fill="' + meta.color + '" opacity="0.10" stroke="none" />' +
+      '<path d="' + lineD + '" fill="none" stroke="' + meta.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />' +
+      points +
+      xLabels +
+      '<text x="' + (lastP[0] - 4).toFixed(1) + '" y="' + (lastP[1] - 10).toFixed(1) + '" text-anchor="end" font-size="11" font-weight="700" fill="var(--text)" class="mono">' + lastLabel.metric_snapshot[meta.metric] + meta.unit + '</text>' +
+      '</svg>';
+
+    var card = document.createElement("div");
+    card.className = "trend-card";
+    card.style.setProperty("--card-accent", meta.color);
+    var flaggedCount = entries.filter(function (e) { return e.classification === meta.flaggedWhen; }).length;
+    var latestEntry = entries[entries.length - 1];
+    var latestStatusClass = STATUS_CLASS[latestEntry.classification] || "status-neutral";
+    card.innerHTML =
+      '<div class="trend-meta">' +
+        '<div class="trend-meta-head">' +
+          '<p class="company-name"><span class="company-dot" style="background:' + meta.color + '"></span>' + esc(company.name) + '</p>' +
+          '<span class="rel-badge">' + esc(company.relationship_type) + '</span>' +
+        '</div>' +
+        '<span class="status-pill ' + latestStatusClass + '"><span class="dot"></span>' + esc(latestEntry.classification.replace(/_/g, " ")) + '</span>' +
+        '<p class="company-sub">' + esc(meta.label) + ' (' + esc(meta.unit === "x" ? "multiple" : "percent") + ') · ' + entries.length + ' quarters, ' + esc(entries[0].quarter) + ' – ' + esc(latestEntry.quarter) + '</p>' +
+        '<div class="trend-legend">' +
+          '<span class="legend-item"><span class="legend-swatch" style="background:' + meta.color + '"></span>Normal</span>' +
+          '<span class="legend-item"><span class="legend-swatch" style="background:var(--critical)"></span>' + esc(meta.flaggedWhen.replace("_"," ")) + ' (' + flaggedCount + ')</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="chart-svg-wrap">' + svg + '<div class="chart-tooltip mono" id="tt-' + company.company_id + '"></div></div>';
+
+    trendGrid.appendChild(card);
+
+    var tooltip = card.querySelector("#tt-" + company.company_id);
+    var wrap = card.querySelector(".chart-svg-wrap");
+    card.querySelectorAll(".hit").forEach(function (hit) {
+      hit.addEventListener("mouseenter", function (evt) { showTip(evt); });
+      hit.addEventListener("mousemove", function (evt) { showTip(evt); });
+      hit.addEventListener("mouseleave", function () { tooltip.classList.remove("show"); });
+      hit.addEventListener("focus", function (evt) { showTip(evt); });
+      hit.addEventListener("click", function () {
+        var idx = parseInt(hit.getAttribute("data-idx"), 10);
+        openEntryModal(company, entries[idx]);
+      });
+      hit.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          var idx = parseInt(hit.getAttribute("data-idx"), 10);
+          openEntryModal(company, entries[idx]);
+        }
+      });
+      function showTip(evt) {
+        var idx = parseInt(hit.getAttribute("data-idx"), 10);
+        var e = entries[idx];
+        var wrapRect = wrap.getBoundingClientRect();
+        var svgRect = hit.ownerSVGElement.getBoundingClientRect();
+        var cx = parseFloat(hit.getAttribute("cx")), cy = parseFloat(hit.getAttribute("cy"));
+        var scaleX = svgRect.width / W, scaleY = svgRect.height / H;
+        var left = (svgRect.left - wrapRect.left) + cx * scaleX;
+        var top = (svgRect.top - wrapRect.top) + cy * scaleY;
+        // Full, untruncated rationale — the click-through modal adds structured detail
+        // (all metrics, contributing assessments, linked incident) on top of this text.
+        tooltip.innerHTML = '<div class="tt-q">' + esc(e.quarter) + '</div>' +
+          '<div class="tt-v">' + e.metric_snapshot[meta.metric] + meta.unit + ' — ' + esc(e.classification.replace(/_/g," ")) + '</div>' +
+          '<div class="tt-r">' + esc(e.rationale || "") + '</div>' +
+          '<div class="tt-r" style="color:var(--accent-text);margin-top:6px">Click for full detail →</div>';
+        // Clamp so the tooltip never renders off the left/right/top edge of the card,
+        // regardless of which point (including the first/last) triggered it.
+        var ttWidth = tooltip.offsetWidth, ttHeight = tooltip.offsetHeight;
+        var minLeft = ttWidth / 2 + 4, maxLeft = wrapRect.width - ttWidth / 2 - 4;
+        var clampedLeft = Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft));
+        var flipBelow = top - ttHeight - 14 < 0;
+        tooltip.style.left = clampedLeft + "px";
+        tooltip.style.top = (flipBelow ? top + 14 : top) + "px";
+        tooltip.style.transform = "translate(-50%, " + (flipBelow ? "10%" : "-110%") + ")";
+        tooltip.classList.add("show");
+      }
+    });
+
+    card.querySelectorAll(".pt").forEach(function(pt){ pt.setAttribute("tabindex","0"); });
+  }
+
+  DATA.companies.forEach(buildTrendChart);
+
+  // ---------------- Incident log ----------------
+  var incidentList = document.getElementById("incident-list");
+  DATA.incidents.forEach(function (inc) {
+    var stripeClass = inc.risk_tier === "critical" ? "critical" : (inc.risk_tier === "high" ? "high" : "");
+    var statusClass = inc.status === "auto_resolved" ? "status-good" : (inc.status === "reviewed" ? "status-good" : "status-warning");
+    var row = document.createElement("div");
+    row.className = "incident-row";
+    row.innerHTML =
+      '<div class="incident-stripe ' + stripeClass + '"></div>' +
+      '<div class="incident-body">' +
+        '<div class="incident-top">' +
+          '<span class="incident-id mono">' + esc(inc.incident_id) + '</span>' +
+          '<span class="incident-kind">' + esc(inc.kind.replace(/_/g, " ")) + '</span>' +
+          '<span class="status-pill ' + statusClass + '"><span class="dot"></span>' + esc(inc.status.replace(/_/g, " ")) + '</span>' +
+        '</div>' +
+        '<div class="incident-detail">' + esc((inc.remediation_detail || "").slice(0, 220)) + '</div>' +
+      '</div>' +
+      '<div class="incident-side">' +
+        '<span class="incident-quarter mono">' + esc(inc.detected_at) + '</span>' +
+        '<span class="status-pill ' + (inc.risk_tier === "critical" ? "status-critical" : "status-warning") + '"><span class="dot"></span>' + esc(inc.risk_tier) + '</span>' +
+        '<span class="company-sub">' + esc((inc.company_ids || []).join(", ")) + '</span>' +
+        '<span class="figure-hint" style="margin-top:0">Click for full detail →</span>' +
+      '</div>';
+    incidentList.appendChild(row);
+    makeClickable(row, function () { openIncidentModal(inc); });
+  });
+
+  // ---------------- Notification table ----------------
+  var notifBody = document.getElementById("notif-tbody");
+  DATA.notifications.forEach(function (n) {
+    var tr = document.createElement("tr");
+    tr.innerHTML =
+      '<td class="chan"><span class="chan-icon"></span>' + esc(n.channel) + '</td>' +
+      '<td>' + esc((n.purpose || "").replace(/_/g, " ")) + '</td>' +
+      '<td class="mono">' + esc(n.target || "—") + '</td>' +
+      '<td><span class="status-chip ' + esc(n.status) + '">' + esc(n.status.replace("_"," ")) + '</span></td>' +
+      '<td class="mono">' + esc(n.incident_id || "—") + '</td>' +
+      '<td class="mono">' + esc((n.timestamp || "").replace("T"," ").slice(0, 19)) + '</td>';
+    notifBody.appendChild(tr);
+  });
+
+  // ---------------- Ask Portfolio Pulse (deterministic, grounded) ----------------
+  var COMPANY_ALIASES = {
+    northwind: ["northwind", "logistics"],
+    solace: ["solace", "behavioral"],
+    ferrous_point: ["ferrous", "ferrous point", "industrial supply"]
+  };
+
+  function findCompanyId(q) {
+    for (var cid in COMPANY_ALIASES) {
+      if (COMPANY_ALIASES[cid].some(function (a) { return q.indexOf(a) !== -1; })) return cid;
+    }
+    return null;
+  }
+  function findQuarter(q) {
+    var m = q.match(/20\d\d[\s\-]?q\s?[1-4]/i);
+    if (!m) return null;
+    return m[0].toUpperCase().replace(/\s|-/g, "").replace("Q", "-Q");
+  }
+  function findIncidentId(q) {
+    var m = q.match(/inc-?\s?0*(\d+)/i);
+    if (!m) return null;
+    return "INC-" + ("0000" + m[1]).slice(-4);
+  }
+
+  function companyById(cid) { return DATA.companies.filter(function (c) { return c.company_id === cid; })[0]; }
+
+  // ---------------- Concept glossary — plain-English definitions of the system's own
+  // vocabulary (not tied to one company), so conceptual questions get a real answer instead
+  // of falling through to "no match". Checked only when no company is named in the question. ----
+  var GLOSSARY = [
+    { test: /\bon.?thesis\b/, term: "on_thesis", body: "\"On thesis\" is a PE classification meaning this quarter's KPIs still track toward the investment thesis set at close — no material deviation flagged." },
+    { test: /\bwatch\b/, term: "watch", body: "\"Watch\" is a PE classification for early softening that doesn't yet warrant an off-thesis call — a signal to monitor next quarter, not an escalation." },
+    { test: /\boff.?thesis\b/, term: "off_thesis", body: "\"Off thesis\" is a PE classification meaning this quarter's KPIs deviated materially from the underwritten thesis. It's pe-thesis-tracker's raw read filtered through trend-synthesizer's noise check before being finalized — an ordinary single bad quarter within normal variance gets filtered back to on_thesis instead." },
+    { test: /\bcompliant\b/, term: "compliant", body: "\"Compliant\" is a PD (private-debt) covenant classification — deterministic math (pulse.policy_rules), never an LLM judgment: the leverage ratio is below the warning threshold." },
+    { test: /\bwarning\b/, term: "warning", body: "\"Warning\" is a PD covenant classification: Total Net Leverage has crossed the warning threshold (≥ 4.0x) but not the breach threshold (≥ 4.5x). Two consecutive warning quarters trigger the Credit Committee reporting clause regardless of trend direction." },
+    { test: /\bbreach\b/, term: "breach", body: "\"Breach\" is a PD covenant classification: Total Net Leverage has crossed ≥ 4.5x — a harder covenant violation than \"warning\"." },
+    { test: /assessment.?fail/, term: "assessment_failed", body: "\"assessment_failed\" is the orchestrator's single defined fallback when an agent's output is missing, malformed, or a tool call errors — written once, never retried indefinitely and never silently skipped (see CLAUDE.md's action-biased-agent design)." },
+    { test: /noise.?filter|trend.?synthesizer/, term: "trend-synthesizer", body: "trend-synthesizer is the noise-filter gate on top of pe-thesis-tracker's raw thesis read: final classification = the raw read if trend-synthesizer judges the move a genuine \"inflection\", else \"on_thesis\" (ordinary noise gets filtered back). Every PE trend entry is stamped with trend-synthesizer's version/model since it's the versioned engine actually being tracked for drift." },
+    { test: /contributing assessment|classifying agent/, term: "contributing_assessments", body: "Each trend entry's \"classifying_agent\"/\"agent_version\" is whichever agent's output is authoritative for that entry (trend-synthesizer for PE, pd-covenant-tracker for PD). \"contributing_assessments\" preserves every agent that fed into that call — e.g. pe-thesis-tracker's raw read alongside trend-synthesizer's noise-filter verdict — so the full reasoning chain stays auditable, not just the final label." },
+    { test: /\bpe\b.*\bpd\b|\bpd\b.*\bpe\b|relationship.?type/, term: "PE / PD", body: "\"PE\" (private equity) companies are tracked against an investment thesis set at close (pe-thesis-tracker + trend-synthesizer). \"PD\" (private debt) companies are tracked against loan-covenant math (pd-covenant-tracker + deterministic policy_rules) — a structurally different classification path, which is why a PD flag can never trigger the PE-only systemic-flag-spike rule." },
+    { test: /idempoten/, term: "idempotency", body: "append_trend_entry is idempotent: calling it twice with an identical (company_id, quarter) entry no-ops on the duplicate and returns the original record rather than writing a second one or raising an error — proven live in this run." },
+    { test: /risk tier/, term: "risk tier", body: "Risk tiers (low/medium/high/critical) come from pulse.risk_scoring's deterministic rules, not an LLM judgment. \"critical\" (e.g. a systemic flag spike) routes to auto_rollback; \"high\" (e.g. a model-boundary ambiguity) always routes to human_review — model-boundary incidents are never auto-resolved by design." },
+    { test: /auto.?rollback|auto.?resolv/, term: "auto_rollback", body: "auto_rollback is the deterministic response to a systemic_flag_spike incident (multiple companies flagged off-thesis in the same quarter by the same agent version) — the registry is rolled back to the previously-active version automatically, no human in the loop, because that pattern is itself strong evidence of an agent regression rather than a real business change." },
+    { test: /ebitda margin/, term: "EBITDA margin", body: "EBITDA margin (%) is Northwind's primary underwriting KPI — EBITDA as a percentage of revenue, tracked quarter over quarter against the thesis case set at close." },
+    { test: /same.?store revenue/, term: "same-store revenue growth", body: "Same-store revenue growth (% YoY) is Solace's primary underwriting KPI — revenue growth at clinics open for the full comparison period, excluding new-clinic openings, tracked against the underwritten range." },
+    { test: /total net leverage/, term: "total net leverage", body: "Total Net Leverage (x) is Ferrous Point's covenant metric — net debt divided by TTM EBITDA. ≥ 4.0x is \"warning\", ≥ 4.5x is \"breach\", per the loan agreement's deterministic thresholds." }
+  ];
+
+  // ---------------- Portfolio-wide / meta questions (counts, lists, summaries) ----------------
+  function metaAnswer(q) {
+    if (/how many compan|list compan|which compan|number of compan/.test(q)) {
+      var lines = DATA.companies.map(function (c) { return c.name + " (" + c.relationship_type + ")"; });
+      return { body: DATA.companies.length + " companies tracked this run:\n" + lines.join("\n"), cites: DATA.companies.map(function (c) { return c.company_id; }) };
+    }
+    if (/how many incident|list incident|which incident|number of incident/.test(q)) {
+      var ilines = DATA.incidents.map(function (i) { return i.incident_id + " — " + i.kind.replace(/_/g, " ") + " (" + i.status.replace(/_/g, " ") + ", " + i.risk_tier + ")"; });
+      return { body: DATA.incidents.length + " incidents on record:\n" + ilines.join("\n"), cites: DATA.incidents.map(function (i) { return i.incident_id; }) };
+    }
+    if (/how many notif|number of notif|notification.*(count|breakdown)/.test(q)) {
+      var byStatus = {};
+      DATA.notifications.forEach(function (n) { byStatus[n.status] = (byStatus[n.status] || 0) + 1; });
+      var breakdown = Object.keys(byStatus).map(function (k) { return k + ": " + byStatus[k]; }).join(", ");
+      return { body: DATA.notifications.length + " notification dispatches this run (" + breakdown + ").", cites: [] };
+    }
+    if (/portfolio summary|overall status|all compan.*status|^current status/.test(q)) {
+      var summary = DATA.companies.map(function (c) {
+        var latest = c.trend_history[c.trend_history.length - 1];
+        return c.name + ": " + latest.classification.replace(/_/g, " ") + " (" + latest.quarter + ")";
+      });
+      return { body: "Current portfolio status:\n" + summary.join("\n"), cites: DATA.companies.map(function (c) { return c.trend_history[c.trend_history.length - 1].quarter; }) };
+    }
+    if (/quarters covered|date range|how many quarters/.test(q)) {
+      var qs = DATA.companies[0].trend_history.map(function (e) { return e.quarter; });
+      return { body: qs.length + " quarters covered: " + qs[0] + " through " + qs[qs.length - 1] + ".", cites: [qs[0], qs[qs.length - 1]] };
+    }
+    if (/which agent|what agent|list agent/.test(q)) {
+      var agentLines = Object.keys(DATA.registry).map(function (a) { return a + " — active " + DATA.registry[a].active.version; });
+      return { body: "6 single-shot subagents in this build:\n" + agentLines.join("\n"), cites: Object.keys(DATA.registry) };
+    }
+    if (/^help$|what can (i|you) ask|what questions|what can this (answer|do)/.test(q)) {
+      return { body: "Ask about: a specific company (Northwind, Solace, Ferrous Point) with or without a quarter, an incident ID (e.g. INC-0002), concepts like \"on thesis\", \"credit committee\", \"model boundary\", or \"idempotency\", portfolio-wide questions (\"how many incidents\", \"portfolio summary\", \"which agents\"), or any other free-text question — unmatched questions fall back to a full-text search over this run's real data.", cites: [] };
+    }
+    return null;
+  }
+
+  // ---------------- Full-text fallback search — last resort before declining. Scores every
+  // real record (trend entries, incidents, registry versions) by shared keyword count against
+  // the question and returns the closest match, honestly framed as a search hit. ----------------
+  var STOPWORDS = { the: 1, is: 1, are: 1, was: 1, were: 1, what: 1, does: 1, mean: 1, for: 1, and: 1, with: 1, this: 1, that: 1, about: 1, why: 1, how: 1, did: 1, happen: 1, happened: 1, tell: 1, you: 1, me: 1, please: 1, explain: 1, who: 1, when: 1, where: 1, its: 1, has: 1, have: 1, had: 1, can: 1, could: 1, would: 1, should: 1, into: 1, out: 1, not: 1, any: 1, all: 1, per: 1 };
+  var SEARCH_CORPUS = (function () {
+    var items = [];
+    DATA.companies.forEach(function (c) {
+      c.trend_history.forEach(function (e) {
+        var extra = (e.contributing_assessments || []).map(function (a) { return a.rationale || ""; }).join(" ");
+        items.push({
+          text: (c.name + " " + e.quarter + " " + e.classification + " " + (e.rationale || "") + " " + extra).toLowerCase(),
+          body: c.name + "'s classification for " + e.quarter + " was " + e.classification.replace(/_/g, " ").toUpperCase() +
+            " (classified by " + e.classifying_agent + " " + e.agent_version + ").\n\n" + e.rationale,
+          cites: [e.classifying_agent + " " + e.agent_version, e.quarter]
+        });
+      });
+    });
+    DATA.incidents.forEach(function (i) {
+      items.push({
+        text: (i.incident_id + " " + i.kind + " " + (i.remediation_detail || "") + " " + (i.human_note || "") + " " + i.risk_tier + " " + i.routing + " " + i.status).toLowerCase(),
+        body: incidentAnswer(i).body,
+        cites: [i.incident_id, i.risk_tier, i.routing]
+      });
+    });
+    Object.keys(DATA.registry).forEach(function (agentKey) {
+      (DATA.registry[agentKey].versions || []).forEach(function (v) {
+        items.push({
+          text: (agentKey + " " + v.version + " " + (v.changelog || "") + " " + (v.objective_statement || "")).toLowerCase(),
+          body: agentKey + " " + v.version + (v.model ? " (" + v.model + ")" : "") + ": " + (v.objective_statement || "") + "\n\n" + (v.changelog || ""),
+          cites: [agentKey + " " + v.version]
+        });
+      });
+    });
+    return items;
+  })();
+
+  function fullTextSearch(q) {
+    var tokens = (q.match(/[a-z0-9]{3,}/g) || []).filter(function (t) { return !STOPWORDS[t]; });
+    if (!tokens.length) return null;
+    var best = null, bestScore = 0;
+    SEARCH_CORPUS.forEach(function (item) {
+      var score = 0;
+      tokens.forEach(function (t) { if (item.text.indexOf(t) !== -1) score++; });
+      if (score > bestScore) { bestScore = score; best = item; }
+    });
+    if (!best || bestScore < 1) return null;
+    return { body: "Closest matching record for that question (full-text search over this run's real data):\n\n" + best.body, cites: best.cites };
+  }
+
+  function answerQuestion(raw) {
+    var q = raw.toLowerCase().trim();
+    if (!q) return { body: "Type a question about a company, a quarter, or an incident ID.", cites: [] };
+
+    var cid = findCompanyId(q);
+    var quarter = findQuarter(q);
+    var incId = findIncidentId(q);
+
+    // Direct incident ID lookup
+    if (incId) {
+      var inc = DATA.incidents.filter(function (i) { return i.incident_id === incId; })[0];
+      if (inc) return incidentAnswer(inc);
+      return { body: "No incident " + incId + " found in this run's data. On record: " + DATA.incidents.map(function(i){return i.incident_id;}).join(", ") + ".", cites: [] };
+    }
+
+    // Company + quarter lookup
+    if (cid && quarter) {
+      var company = companyById(cid);
+      var entry = company.trend_history.filter(function (e) { return e.quarter === quarter; })[0];
+      if (!entry) return { body: "No recorded entry for " + company.name + " in " + quarter + ".", cites: [] };
+      var relatedIncident = DATA.incidents.filter(function (i) { return (i.company_ids || []).indexOf(cid) !== -1 && i.detected_at === entry.quarter; })[0];
+      var body = company.name + "'s classification for " + quarter + " was " + entry.classification.replace(/_/g," ").toUpperCase() +
+        " (classified by " + entry.classifying_agent + " " + entry.agent_version + ", model " + entry.model + ").\n\n" + entry.rationale;
+      var cites = [entry.classifying_agent + " " + entry.agent_version, entry.quarter];
+      if (relatedIncident) {
+        body += "\n\nThis quarter is also linked to incident " + relatedIncident.incident_id + " (" + relatedIncident.kind.replace(/_/g," ") + ", " + relatedIncident.status + ").";
+        cites.push(relatedIncident.incident_id);
+      }
+      return { body: body, cites: cites };
+    }
+
+    // Why/who + rollback/regression
+    if (/rollback|regress|spike|auto.?rollback/.test(q)) {
+      var spike = DATA.incidents.filter(function (i) { return i.kind === "systemic_flag_spike"; })[0];
+      if (spike) return incidentAnswer(spike);
+    }
+
+    // Model boundary / model change
+    if (/model.?boundary|model.?chang|interpretation/.test(q)) {
+      var boundary = DATA.incidents.filter(function (i) { return i.kind === "model_boundary_ambiguity" && i.status === "reviewed"; })[0];
+      if (boundary) return incidentAnswer(boundary);
+    }
+
+    // Credit Committee / covenant
+    if (/credit committee|covenant|leverage/.test(q)) {
+      var fp = companyById("ferrous_point");
+      var warnings = fp.trend_history.filter(function (e) { return e.classification === "warning"; });
+      var body2 = "Ferrous Point Industrial Supply's Total Net Leverage crossed into warning (≥4.0x) starting " +
+        (warnings[0] ? warnings[0].quarter : "n/a") + ". The Credit Committee reporting clause " +
+        "(2+ consecutive warning quarters, regardless of trend direction) triggered once the streak reached 2, dispatching a Jira ticket, Confluence page, and Slack post. " +
+        "It is deterministic covenant math (pulse.orchestrator.classify_pd_covenant) — never an LLM judgment — and by design can never trigger the systemic-flag-spike rule.";
+      return { body: body2, cites: warnings.map(function(w){return w.quarter;}) };
+    }
+
+    // Stale / re-notify
+    if (/stale|re-?notif|silence|unresolved/.test(q)) {
+      var stale = DATA.incidents.filter(function (i) { return i.status === "pending_review"; })[0];
+      if (stale) return incidentAnswer(stale, true);
+    }
+
+    // Concept glossary — only when no company is named, so it doesn't hijack company questions
+    if (!cid) {
+      for (var gi = 0; gi < GLOSSARY.length; gi++) {
+        if (GLOSSARY[gi].test.test(q)) return { body: GLOSSARY[gi].body, cites: [GLOSSARY[gi].term] };
+      }
+    }
+
+    // Portfolio-wide / meta questions (counts, lists, summaries)
+    var meta = metaAnswer(q);
+    if (meta) return meta;
+
+    // Company-only: latest status
+    if (cid) {
+      var company2 = companyById(cid);
+      var latest = company2.trend_history[company2.trend_history.length - 1];
+      return {
+        body: company2.name + "'s latest recorded status (" + latest.quarter + ") is " + latest.classification.replace(/_/g, " ").toUpperCase() + ".\n\n" + latest.rationale,
+        cites: [latest.quarter, latest.classifying_agent + " " + latest.agent_version]
+      };
+    }
+
+    // Last resort: full-text search over every real record in this run — before declining
+    var searchHit = fullTextSearch(q);
+    if (searchHit) return searchHit;
+
+    var companyNames = DATA.companies.map(function (c) { return c.name; }).join(", ");
+    var incidentIds = DATA.incidents.map(function (i) { return i.incident_id; }).join(", ");
+    return {
+      body: "No matching record found in this run's real data for that question, even after a full-text search. Try a company (" + companyNames + "), a quarter (e.g. \"2026-Q1\"), an incident ID (" + incidentIds + "), a concept (\"on thesis\", \"credit committee\", \"idempotency\"), or a portfolio-wide question (\"how many incidents\", \"portfolio summary\", \"which agents\").",
+      cites: []
+    };
+  }
+
+  function incidentAnswer(inc, isStaleQuery) {
+    var body = "Incident " + inc.incident_id + " (" + inc.kind.replace(/_/g, " ") + ", detected " + inc.detected_at + "): " + inc.remediation_detail +
+      "\n\nRouting: " + inc.routing.replace(/_/g," ") + " · Risk tier: " + inc.risk_tier + " · Status: " + inc.status.replace(/_/g," ") +
+      (inc.company_ids && inc.company_ids.length ? ("\nCompanies: " + inc.company_ids.join(", ")) : "");
+    if (inc.human_note) body += "\n\nHuman review (" + (inc.resolved_by || "unknown") + "): " + inc.human_note;
+    if (inc.counterfactual) body += "\n\nCounterfactual on record: what the prior version would have said on the identical input is attached to this incident's replay bundle.";
+    if (isStaleQuery && inc.escalation_log && inc.escalation_log.length) {
+      body += "\n\nEscalation log: " + inc.escalation_log.map(function(e){ return e.escalated_at + " -> " + e.new_risk_tier; }).join("; ");
+    }
+    return { body: body, cites: [inc.incident_id, inc.risk_tier, inc.routing] };
+  }
+
+  var askForm = document.getElementById("ask-form");
+  var askInput = document.getElementById("ask-input");
+  var askAnswer = document.getElementById("ask-answer");
+  var askAnswerQ = document.getElementById("ask-answer-q");
+  var askAnswerBody = document.getElementById("ask-answer-body");
+  var askAnswerCites = document.getElementById("ask-answer-cites");
+
+  function renderDeterministicAnswer(text, noteSuffix) {
+    var result = answerQuestion(text);
+    askAnswerBody.textContent = result.body;
+    askAnswerCites.innerHTML = result.cites.map(function (c) { return '<span class="ask-cite mono">' + esc(c) + '</span>'; }).join("") +
+      '<div class="ask-note">Answered fresh, every time, by a deterministic engine over data_snapshot.json (structured lookups, a concept glossary, portfolio stats, and a full-text fallback search) — matched fields cited above, never a live model call.' + (noteSuffix || "") + '</div>';
+  }
+
+  // Tries the optional local /ask backend (dashboard/ask_server.py — real LLM call, only
+  // running if the user started it with an OPENAI_API_KEY configured) first; on any failure
+  // — not running, timed out, no key configured, opened as a plain file — falls back to the
+  // built-in deterministic engine automatically, silently, every time. Never shows an error.
+  function runAsk(text) {
+    askAnswerQ.textContent = "You asked: “" + text + "”";
+    askAnswerBody.textContent = "Thinking…";
+    askAnswerCites.innerHTML = "";
+    askAnswer.classList.add("show");
+
+    var controller = ("AbortController" in window) ? new AbortController() : null;
+    var timeoutId = controller ? setTimeout(function () { controller.abort(); }, 15000) : null;
+
+    fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: text }),
+      signal: controller ? controller.signal : undefined
+    }).then(function (resp) {
+      if (timeoutId) clearTimeout(timeoutId);
+      if (!resp.ok) throw new Error("ask_server returned " + resp.status);
+      return resp.json();
+    }).then(function (data) {
+      if (!data.answer) throw new Error("no answer field in /ask response");
+      askAnswerBody.textContent = data.answer;
+      askAnswerCites.innerHTML = '<span class="ask-cite mono">' + esc(data.model || "openai") + '</span>' +
+        '<span class="ask-cite mono">temperature 0</span>' +
+        '<div class="ask-note">Answered live by ' + esc(data.model || "an LLM") + ' via the local /ask server, grounded in this run\'s real data_snapshot.json (it can only answer from that data) — question and answer both PII-redacted before/after the call.</div>';
+    }).catch(function () {
+      if (timeoutId) clearTimeout(timeoutId);
+      renderDeterministicAnswer(text, " (No /ask server detected — this is the automatic fallback engine.)");
+    });
+  }
+
+  askForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (askInput.value.trim()) runAsk(askInput.value.trim());
+  });
+
+  var SAMPLE_QUESTIONS = [
+    "why was solace flagged in 2026-Q1?",
+    "what happened with the model boundary?",
+    "why did the rollback happen?",
+    "credit committee escalation?",
+    "northwind status 2026-Q4",
+    "what does off-thesis mean?",
+    "portfolio summary"
+  ];
+  var chips = document.getElementById("ask-chips");
+  SAMPLE_QUESTIONS.forEach(function (s) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "ask-chip";
+    b.textContent = s;
+    b.addEventListener("click", function () { askInput.value = s; runAsk(s); });
+    chips.appendChild(b);
+  });
+
+  // Pre-populate the panel with one real example on load, so the "Ask Portfolio Pulse"
+  // section demonstrates itself immediately rather than starting empty — tries the live
+  // backend first, same as any manually-typed question, and falls back automatically.
+  runAsk("why did the rollback happen?");
+})();
+</script>

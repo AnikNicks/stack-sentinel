@@ -1,0 +1,13 @@
+version: v1
+agent: pd-covenant-tracker
+created: '2024-10-15'
+changelog: 'Initial release: wraps deterministic covenant math and judges trajectory
+  toward covenant thresholds, not just point-in-time pass/fail.'
+prompt_file: .claude/agents/pd-covenant-tracker.md
+tool_scope:
+- get_loan_agreement
+- get_financials
+- get_trend_history
+model: claude-sonnet-4-20250514
+objective_statement: Judge a PD borrower's trajectory toward its loan covenants, using
+  pre-computed deterministic ratios.

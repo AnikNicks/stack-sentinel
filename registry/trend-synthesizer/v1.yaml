@@ -1,0 +1,11 @@
+version: v1
+agent: trend-synthesizer
+created: '2024-11-01'
+changelog: 'Initial release: flags a quarter''s KPI movement as a genuine inflection
+  if it deviates from the immediately prior quarter beyond a fixed threshold.'
+prompt_file: .claude/agents/trend-synthesizer.md
+tool_scope:
+- get_trend_history
+model: claude-sonnet-4-20250514
+objective_statement: Judge whether this quarter's number is a genuine inflection or
+  normal noise, in the context of prior quarters.

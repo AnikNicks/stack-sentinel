@@ -1,0 +1,13 @@
+{
+  "company_id": "solace",
+  "quarters": {
+    "2025-Q1": {"same_store_revenue_growth_pct_yoy": 8.0, "new_clinics_opened_cumulative": 0, "commercial_payor_mix_pct": 56.0},
+    "2025-Q2": {"same_store_revenue_growth_pct_yoy": 8.2, "new_clinics_opened_cumulative": 1, "commercial_payor_mix_pct": 57.5},
+    "2025-Q3": {"same_store_revenue_growth_pct_yoy": 8.4, "new_clinics_opened_cumulative": 1, "commercial_payor_mix_pct": 59.0},
+    "2025-Q4": {"same_store_revenue_growth_pct_yoy": 8.6, "new_clinics_opened_cumulative": 2, "commercial_payor_mix_pct": 60.5},
+    "2026-Q1": {"same_store_revenue_growth_pct_yoy": 8.4, "new_clinics_opened_cumulative": 2, "commercial_payor_mix_pct": 62.0, "note": "Slight January patient-volume softness (typical seasonal pattern); small QoQ dip against an otherwise steady uptrend."},
+    "2026-Q2": {"same_store_revenue_growth_pct_yoy": 8.6, "new_clinics_opened_cumulative": 3, "commercial_payor_mix_pct": 63.0},
+    "2026-Q3": {"same_store_revenue_growth_pct_yoy": 8.3, "new_clinics_opened_cumulative": 3, "commercial_payor_mix_pct": 63.5, "note": "Within normal seasonal variance for Q3 (clinic staff summer PTO); no underlying deterioration."},
+    "2026-Q4": {"same_store_revenue_growth_pct_yoy": 8.6, "new_clinics_opened_cumulative": 4, "commercial_payor_mix_pct": 64.5}
+  }
+}

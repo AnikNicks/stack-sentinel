@@ -1,0 +1,7 @@
+agent: trend-synthesizer
+active_version: v2
+activated_by: pulse-auto-rollback
+activated_at: '2026-08-13T04:53:17.675023+00:00'
+reason: "2 of 3 companies flagged in one quarter (threshold 2) \u2014 real trouble\
+  \ is gradual, not simultaneous; this pattern is the fingerprint of an agent-version\
+  \ regression."
