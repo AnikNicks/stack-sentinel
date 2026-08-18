@@ -3,8 +3,8 @@ the simulation run, prints its exact recorded version/model/input, compares actu
 counterfactual output, and prints a root-cause narrative — all read directly from the real
 incident bundle on disk, not hand-typed.
 
-This is the concrete answer to "why did we call this company off_thesis in Q1 2026 when it
-clearly wasn't" — the whole reason the incident/replay-bundle system exists.
+This is the concrete answer to "why did we call this company drifted in S06 when it clearly
+wasn't" — the whole reason the incident/replay-bundle system exists.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def main() -> None:
     print(f"INCIDENT REPLAY BUNDLE: {bundle['incident_id']}")
     print("=" * 78)
     print(f"kind:          {bundle['kind']}")
-    print(f"detected_at:   {bundle['detected_at']}  (simulated quarter date)")
+    print(f"detected_at:   {bundle['detected_at']}  (simulated cycle date)")
     print(f"agent_version: {bundle['agent_version']}  (the version ACTIVE when this fired)")
     print(f"model:         {bundle['model']}")
     print(f"companies:     {bundle['company_ids']}")
@@ -75,11 +75,11 @@ def main() -> None:
     actual_kinds = set(bundle["output_snapshot"].values())
     print(
         f"{len(bundle['company_ids'])} companies ({', '.join(bundle['company_ids'])}) were classified "
-        f"{'/'.join(actual_kinds)} in the same quarter under {bundle['agent_version']}, tripping the "
+        f"{'/'.join(actual_kinds)} in the same cycle under {bundle['agent_version']}, tripping the "
         f"systemic-flag-spike threshold (an absolute company count, not a ratio — see "
-        f"pulse/risk_scoring.py). The recorded input shows each flagged company's own metrics were "
-        f"either flat or only marginally down against a multi-quarter uptrend — not the kind of "
-        f"broad-based deterioration real, unrelated portfolio trouble would produce. The counterfactual "
+        f"pulse/risk_scoring.py). The recorded input shows each flagged company's own layer changes "
+        f"were routine, unrelated config/integration updates — not the kind of broad-based, genuine "
+        f"behavior drift real, unrelated portfolio trouble would produce. The counterfactual "
         f"above shows the prior version reading the SAME input as ordinary noise, not an inflection. "
         f"Conclusion: this was a version regression, not a business event — which is exactly what "
         f"auto-rollback (routing={bundle['routing']!r}) responded to, with status={bundle['status']!r} "

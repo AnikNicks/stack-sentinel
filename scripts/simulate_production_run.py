@@ -1,13 +1,14 @@
-"""2 years compressed into one run: walks 2025-Q1 -> 2026-Q4 (8 quarters) across 3 portfolio
-companies (Northwind + Solace, PE; Ferrous Point, PD), executing every piece of real
-deterministic machinery in pulse/ against SCRIPTED quarterly agent outputs (honestly labeled
-below as standing in for live agent calls this environment can't make — see CLAUDE.md and
-README.md for why).
+"""10 bi-weekly sprint cycles compressed into one run: walks 2025-S01 -> 2025-S10 across 3
+companies (Meridian Labs + Wayfinder AI, CHARTER-tracked; Cascade Analytics, SLO-tracked),
+executing every piece of real deterministic machinery in pulse/ against SCRIPTED per-cycle
+agent outputs (honestly labeled below as standing in for live agent calls this environment
+can't make — see CLAUDE.md and README.md for why).
 
 Only each agent's CLASSIFICATION judgment is scripted. Every failure path, idempotency
-check, model-boundary detection, risk-scoring decision, rollback, and notification dispatch
-below is produced by the real code in pulse/ acting on that scripted input — asserted on
-real return values as the script runs, not printed as pre-written narration.
+check, model-boundary detection, destructive-layer-change detection, risk-scoring decision,
+rollback, and notification dispatch below is produced by the real code in pulse/ acting on
+that scripted input — asserted on real return values as the script runs, not printed as
+pre-written narration.
 
 Run with --reset to clear all prior simulation state first (recommended for a "fresh run").
 Run with --live to actually fire real Gmail/Jira/Confluence/Slack notifications instead of
@@ -31,12 +32,12 @@ from pulse import incidents, notifications, orchestrator, policy_rules, registry
 from pulse.paths import AUDIT_LOG_PATH, INCIDENTS_DIR, NOTIFICATIONS_LOG_PATH, PROJECT_ROOT, REGISTRY_DIR, TREND_STORE_DIR
 from pulse.retry import CallBudget
 
-QUARTERS = ["2025-Q1", "2025-Q2", "2025-Q3", "2025-Q4", "2026-Q1", "2026-Q2", "2026-Q3", "2026-Q4"]
+CYCLES = [f"2025-S{n:02d}" for n in range(1, 11)]
 PORTFOLIO_SIZE = 3
 OLD_MODEL = "claude-sonnet-4-20250514"
-NEW_MODEL = "claude-sonnet-4-5-20250929"  # Solace's Q3-2026 model-boundary event only
+NEW_MODEL = "claude-sonnet-4-5-20250929"  # Wayfinder's S09 model-boundary event only
 
-FERROUS_THRESHOLDS = {"warning_at_or_above": 4.0, "breach_at_or_above": 4.5}
+CASCADE_THRESHOLDS = {"warning_at_or_above": 80, "breach_at_or_above": 100}
 
 scenario_facts: dict = {}
 
@@ -69,7 +70,7 @@ def reset_state() -> None:
 
 # ---------------------------------------------------------------------------------------
 # Fault-injection drills — genuinely exercised, not narrated. Run once, before the main
-# 8-quarter walk, using self-contained inputs that don't touch the 3 companies' real data.
+# 10-cycle walk, using self-contained inputs that don't touch the 3 companies' real data.
 # ---------------------------------------------------------------------------------------
 
 def run_fault_injection_drills() -> None:
@@ -99,18 +100,18 @@ def run_fault_injection_drills() -> None:
 
     # 3. Malformed agent output -> orchestrator's ONE default: assessment_failed entry.
     malformed_output = {"raw_classification": "not_a_real_enum_value", "rationale": "x"}
-    errors = orchestrator.schema_validator.validate(malformed_output, orchestrator.PE_THESIS_SCHEMA)
+    errors = orchestrator.schema_validator.validate(malformed_output, orchestrator.GOAL_DRIFT_SCHEMA)
     assert errors, "schema validator failed to catch a malformed enum value"
     log(f"[drill 3] schema_validator caught malformed output for real: {errors}")
-    demo_caller = {"agent": "pe-thesis-tracker", "agent_version": "v1"}
+    demo_caller = {"agent": "goal-drift-tracker", "agent_version": "v1"}
     failed_entry = tools_impl.append_trend_entry({
-        "company_id": "demo-fault-injection", "quarter": "2025-Q1", "relationship_type": "PE",
-        "classifying_agent": "trend-synthesizer", "agent_version": "v1", "model": OLD_MODEL,
+        "company_id": "demo-fault-injection", "cycle": "2025-S01", "monitoring_track": "CHARTER",
+        "classifying_agent": "change-impact-synthesizer", "agent_version": "v1", "model": OLD_MODEL,
         "metric_snapshot": {}, "classification": "assessment_failed",
         "rationale": "Assessment failed — ONE default applied, no retry: " + "; ".join(errors),
     }, caller=demo_caller)
     assert failed_entry["classification"] == "assessment_failed"
-    log(f"[drill 3] real assessment_failed entry written: {failed_entry['company_id']}/{failed_entry['quarter']}")
+    log(f"[drill 3] real assessment_failed entry written: {failed_entry['company_id']}/{failed_entry['cycle']}")
 
     # 4. Budget cap -> fails loudly, never silently truncates.
     budget = CallBudget(max_calls=2)
@@ -144,101 +145,94 @@ def run_fault_injection_drills() -> None:
 
 
 # ---------------------------------------------------------------------------------------
-# Scripted agent outputs per company per quarter — ONLY the classification judgment is
-# scripted (see module docstring). Everything else downstream is real.
+# Scripted agent outputs per company per cycle — ONLY the classification judgment is
+# scripted (see module docstring). Everything else downstream is real, including
+# destructive-layer-change detection, which is derived automatically from the real
+# data/layer_metrics/*.json snapshots, never scripted here.
 # ---------------------------------------------------------------------------------------
 
-NORTHWIND_SCRIPT = {
-    "2025-Q1": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Margin at 14.5% vs. 12.0% entry level, first reporting quarter — tracking toward the 15.0% year-1 target."},
-        "ts": {"read": "noise", "rationale": "First reporting quarter; no trailing window yet, treated as baseline."},
+_HEALTHY = {"raw_classification": "on_charter", "rationale": "No behavior_incidents this cycle; system operating within its charter boundaries."}
+_NOISE = {"read": "noise", "rationale": "No layer change_event this cycle plausibly bears on the finding; nothing to attribute."}
+
+MERIDIAN_SCRIPT = {
+    "2025-S01": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S02": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S03": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S04": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S05": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S06": {
+        "goal_drift": {
+            "raw_classification": "drifted",
+            "rationale": "Audit-log ordering shows a $210 refund's completion timestamp preceding its human-approval timestamp — on its face, a refund executed before the required approval, a direct hit on the over-$200 boundary.",
+        },
+        "change_impact": {
+            "read": "attributable",
+            "rationale": "[v3] A tools-layer config_event landed this cycle (resolution-agent prompt template updated) — treating the co-occurring change as sufficient grounds to keep this attributable and flagged.",
+        },
     },
-    "2025-Q2": {
-        "pe": {"raw_classification": "off_thesis", "rationale": "Margin fell to 13.8% from 14.5% (QoQ decline) amid a fuel-cost spike (index 134); taken at face value this quarter's KPI misses the trajectory toward the 15.0% year-1 target."},
-        "ts": {"read": "noise", "rationale": "Fuel cost index spiked to 134 vs. a ~100 baseline — a known, identifiable transitory cost input, not a change in underlying unit economics. One-quarter dips explained by an isolated, named cost driver are noise, not a trend break."},
-    },
-    "2025-Q3": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Margin recovered to 15.2%, above the 15.0% year-1 target."},
-        "ts": {"read": "inflection", "rationale": "Fuel index normalized to 106 and margin recovered above the prior trend line — genuine continuation of the underlying uptrend, not noise."},
-    },
-    "2025-Q4": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Margin at 15.9%, continuing to climb."},
-        "ts": {"read": "inflection", "rationale": "Third consecutive quarter of margin improvement — a genuine, sustained trend."},
-    },
-    "2026-Q1": {
-        "pe": {"raw_classification": "off_thesis", "rationale": "Margin dipped to 15.7% from 15.9% (QoQ decline); taken at face value this quarter's KPI misses trend."},
-        "ts": {"read": "inflection", "rationale": "[v3] Flagged as a significant deviation requiring escalation given tightened short-term sensitivity thresholds."},
-    },
-    "2026-Q2": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Margin rebounded strongly to 16.9% from 15.7%."},
-        "ts": {"read": "inflection", "rationale": "Strong rebound confirms the prior quarter's small dip was noise, not a trend break — genuine continuation of the underlying uptrend."},
-    },
-    "2026-Q3": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Margin at 17.3%, approaching the 18.0% year-3 target."},
-        "ts": {"read": "inflection", "rationale": "Fourth consecutive quarter (excluding the Q1 blip) of genuine margin improvement."},
-    },
-    "2026-Q4": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Margin at 17.8%, essentially at the 18.0% year-3 target a year ahead of schedule."},
-        "ts": {"read": "inflection", "rationale": "Sustained, genuine improvement continuing through year-end."},
-    },
+    "2025-S07": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S08": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S09": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S10": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
 }
 
 # The counterfactual: what v2 (the correct, non-regressed filter) would have said on the
-# IDENTICAL 2026-Q1 input. Computed here as real scripted data attached to the incident
+# IDENTICAL 2025-S06 input. Computed here as real scripted data attached to the incident
 # bundle for investigation purposes, per the plan's requirement.
-NORTHWIND_Q1_2026_V2_COUNTERFACTUAL = {
+MERIDIAN_S06_V2_COUNTERFACTUAL = {
     "read": "noise",
-    "rationale": "Trailing window (13.8 -> 15.2 -> 15.9 -> 15.7) shows a clear 3-quarter uptrend; a single small QoQ dip within that pattern is ordinary variance, not a trend break.",
-    "counterfactual_final_classification": "on_thesis",
+    "rationale": "The tools-layer config_event only touched prompt wording, not timestamp logging; the audit-log ordering discrepancy is a benign timestamp-write-order artifact of that deploy, not evidence the approval step was actually skipped — the refund's own execution log confirms approval was captured before completion. Noise, not a real boundary violation.",
+    "counterfactual_final_classification": "on_charter",
 }
 
-SOLACE_SCRIPT = {
-    "2025-Q1": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Same-store revenue growth at 8.0%, within the 7.0-11.0% underwritten range, first reporting quarter."},
-        "ts": {"read": "noise", "rationale": "First reporting quarter; no trailing window yet, treated as baseline."},
+WAYFINDER_SCRIPT = {
+    "2025-S01": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S02": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S03": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S04": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S05": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S06": {
+        "goal_drift": {
+            "raw_classification": "drifted",
+            "rationale": "Audit-log ordering shows a non-refundable booking's completion timestamp preceding its logged customer-confirmation timestamp — on its face, a booking confirmed before the required customer confirmation was captured.",
+        },
+        "change_impact": {
+            "read": "attributable",
+            "rationale": "[v3] An mcp-layer integration_update landed this cycle (booking-provider MCP bump) — treating the co-occurring change as sufficient grounds to keep this attributable and flagged.",
+        },
     },
-    "2025-Q2": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Growth up to 8.2%; first de novo clinic opened this quarter."},
-        "ts": {"read": "inflection", "rationale": "Genuine continuation — growth accelerating alongside the first de novo clinic opening."},
+    "2025-S07": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S08": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
+    "2025-S09": {
+        "goal_drift": {
+            "raw_classification": "drifted",
+            "rationale": "Audit-log ordering again shows a non-refundable booking's completion timestamp preceding its logged customer-confirmation timestamp, this cycle following the booking-provider MCP tool version bump (v4 -> v4.1).",
+        },
+        "change_impact": {
+            "read": "attributable",
+            "rationale": "Under this cycle's model, the co-occurring mcp-layer tool_version_bump reads as sufficient grounds to treat the ordering discrepancy as a real, attributable finding.",
+        },
     },
-    "2025-Q3": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Growth up to 8.4%."},
-        "ts": {"read": "inflection", "rationale": "Genuine, sustained acceleration."},
-    },
-    "2025-Q4": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Growth up to 8.6%; second clinic opened cumulative."},
-        "ts": {"read": "inflection", "rationale": "Genuine continuation of the uptrend alongside clinic expansion."},
-    },
-    "2026-Q1": {
-        "pe": {"raw_classification": "off_thesis", "rationale": "Growth dipped to 8.4% from 8.6% (QoQ decline); taken at face value this quarter's KPI misses trend."},
-        "ts": {"read": "inflection", "rationale": "[v3] Flagged as a significant deviation requiring escalation given tightened short-term sensitivity thresholds."},
-    },
-    "2026-Q2": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Growth rebounded to 8.6%; third clinic opened."},
-        "ts": {"read": "inflection", "rationale": "Rebound confirms the prior quarter's dip was noise — genuine continuation of the underlying uptrend."},
-    },
-    "2026-Q3": {
-        "pe": {"raw_classification": "off_thesis", "rationale": "Growth dipped to 8.3% from 8.6% (QoQ decline); taken at face value this quarter's KPI misses trend."},
-        # This is the model-boundary quarter: same trend-synthesizer VERSION (v2) as last
-        # quarter, but the model actually used for this call differs (see model_override
-        # below). The new model's read genuinely differs from what the old model would say.
-        "ts": {"read": "inflection", "rationale": "Within a model reading this trailing window with tighter variance tolerance, a dip below the recent range reads as a genuine deviation warranting escalation."},
-    },
-    "2026-Q4": {
-        "pe": {"raw_classification": "on_thesis", "rationale": "Growth recovered to 8.6%; fourth clinic opened."},
-        "ts": {"read": "inflection", "rationale": "Recovery confirms Q3's dip was within normal variance, not a genuine business change."},
-    },
+    "2025-S10": {"goal_drift": _HEALTHY, "change_impact": _NOISE},
 }
 
-FERROUS_POINT_SCRIPT = {
-    "2025-Q1": {"trajectory": "stable", "rationale": "Leverage at 3.6x, first reporting quarter, comfortably below the 4.0x warning threshold."},
-    "2025-Q2": {"trajectory": "deteriorating", "rationale": "Leverage ticked up to 3.7x from 3.6x — input-cost pressure on EBITDA."},
-    "2025-Q3": {"trajectory": "deteriorating", "rationale": "Leverage up to 3.8x from 3.7x, continuing the gradual climb."},
-    "2025-Q4": {"trajectory": "deteriorating", "rationale": "Leverage up to 3.9x from 3.8x, approaching the 4.0x warning threshold."},
-    "2026-Q1": {"trajectory": "stable", "rationale": "Leverage flat at 3.9x — cost pressure plateaued this quarter."},
-    "2026-Q2": {"trajectory": "deteriorating", "rationale": "Leverage crossed to 4.1x from 3.9x — 1st consecutive warning-level quarter."},
-    "2026-Q3": {"trajectory": "deteriorating", "rationale": "Leverage up to 4.3x from 4.1x — 2nd consecutive warning-level quarter; Credit Committee reporting clause applies regardless of trend direction."},
-    "2026-Q4": {"trajectory": "stable", "rationale": "Leverage flat at 4.3x — elevated but no longer worsening quarter-over-quarter."},
+WAYFINDER_S06_V2_COUNTERFACTUAL = {
+    "read": "noise",
+    "rationale": "The mcp-layer integration_update was provider-side and backward compatible; the ordering discrepancy is a benign timestamp-write-order artifact, not evidence the confirmation step was actually skipped — the booking's own session log confirms confirmation was captured before completion. Noise, not a real boundary violation.",
+    "counterfactual_final_classification": "on_charter",
+}
+
+CASCADE_SCRIPT = {
+    "2025-S01": {"trajectory": "stable", "rationale": "First reporting cycle; error budget at 62%, comfortably under the 80% warning threshold."},
+    "2025-S02": {"trajectory": "deteriorating", "rationale": "Error budget climbed to 68% from 62%."},
+    "2025-S03": {"trajectory": "deteriorating", "rationale": "Error budget climbed to 74% from 68%, continuing the gradual climb."},
+    "2025-S04": {"trajectory": "deteriorating", "rationale": "Error budget climbed to 79% from 74%, approaching the 80% warning threshold."},
+    "2025-S05": {"trajectory": "stable", "rationale": "Error budget eased slightly to 76% from 79%."},
+    "2025-S06": {"trajectory": "deteriorating", "rationale": "Error budget crossed to 82% from 76% — 1st consecutive warning-level cycle."},
+    "2025-S07": {"trajectory": "deteriorating", "rationale": "Error budget climbed further to 91% from 82% — 2nd consecutive warning-level cycle; RRB reporting clause applies regardless of trend direction."},
+    "2025-S08": {"trajectory": "stable", "rationale": "Error budget at 95%, still warning-level. A proposed non-reversible database schema migration (dropping raw_events_archive) landed this cycle and is pending human approval — not executed."},
+    "2025-S09": {"trajectory": "improving", "rationale": "Error budget eased to 85% from 95% following the approved cleanup migration."},
+    "2025-S10": {"trajectory": "improving", "rationale": "Error budget eased further to 80%, nearing compliant."},
 }
 
 
@@ -258,8 +252,8 @@ def main() -> None:
 
     run_fault_injection_drills()
 
-    log("=== Activating v1 for all 6 agents (2025-Q1 baseline) ===")
-    for agent in ["pe-thesis-tracker", "pd-covenant-tracker", "trend-synthesizer",
+    log("=== Activating v1 for all 6 agents (2025-S01 baseline) ===")
+    for agent in ["goal-drift-tracker", "slo-risk-tracker", "change-impact-synthesizer",
                   "model-boundary-interpreter", "portfolio-rollup-writer", "policy-compliance-checker"]:
         pointer = registry.activate(agent, "v1", activated_by="initial-deployment", reason="Initial production deployment.")
         log(f"  {agent} -> {pointer['active_version']} (by {pointer['activated_by']})")
@@ -267,137 +261,156 @@ def main() -> None:
 
     rollback_incident_id = None
     boundary_incident_id = None
-    credit_committee_dispatch_quarter = None
+    destructive_incident_id = None
+    rrb_dispatch_cycle = None
 
-    for quarter in QUARTERS:
-        log(f"########## {quarter} ##########")
-        as_of = orchestrator.quarter_end_date(quarter)
+    for cycle in CYCLES:
+        log(f"########## {cycle} ##########")
+        as_of = orchestrator.cycle_end_date(cycle)
 
-        if quarter == "2025-Q2":
-            pointer = registry.activate("trend-synthesizer", "v2", activated_by="deal-team-lead",
-                                         reason="Trailing-3-quarter noise filtering — see registry/trend-synthesizer/v2.yaml changelog.")
-            log(f"[registry] trend-synthesizer activated -> v2 (by {pointer['activated_by']}): legitimate version improvement.")
+        if cycle == "2025-S02":
+            pointer = registry.activate("change-impact-synthesizer", "v2", activated_by="engineering-lead",
+                                         reason="Causal-attribution tightening — see registry/change-impact-synthesizer/v2.yaml changelog.")
+            log(f"[registry] change-impact-synthesizer activated -> v2 (by {pointer['activated_by']}): legitimate version improvement.")
 
-        if quarter == "2026-Q1":
-            pointer = registry.activate("trend-synthesizer", "v3", activated_by="deal-team-lead",
-                                         reason="Tightened short-term sensitivity — see registry/trend-synthesizer/v3.yaml changelog.")
-            log(f"[registry] trend-synthesizer activated -> v3 (by {pointer['activated_by']}): innocuous-looking changelog.")
+        if cycle == "2025-S06":
+            pointer = registry.activate("change-impact-synthesizer", "v3", activated_by="engineering-lead",
+                                         reason="Tightened short-term sensitivity — see registry/change-impact-synthesizer/v3.yaml changelog.")
+            log(f"[registry] change-impact-synthesizer activated -> v3 (by {pointer['activated_by']}): innocuous-looking changelog.")
 
-        budget_nw = CallBudget()
-        budget_so = CallBudget()
-        budget_fp = CallBudget()
+        budget_mer = CallBudget()
+        budget_way = CallBudget()
+        budget_cas = CallBudget()
 
-        nw_script = NORTHWIND_SCRIPT[quarter]
-        nw_result = orchestrator.run_pe_company_cycle(
-            company_id="northwind", quarter=quarter,
-            pe_thesis_output=nw_script["pe"], trend_synth_output=nw_script["ts"], budget=budget_nw,
+        mer_script = MERIDIAN_SCRIPT[cycle]
+        mer_result = orchestrator.run_charter_company_cycle(
+            company_id="meridian", cycle=cycle,
+            goal_drift_output=mer_script["goal_drift"], change_impact_output=mer_script["change_impact"],
+            budget=budget_mer,
         )
-        log(f"[northwind]     {nw_result['entry']['classification']:16s} | {nw_result['entry']['rationale'][:110]}")
+        log(f"[meridian]  {mer_result['entry']['classification']:16s} | {mer_result['entry']['rationale'][:110]}")
 
-        # Real idempotency proof — right after the real 2025-Q1 write, call
-        # append_trend_entry a second time with the IDENTICAL entry and assert no duplicate.
-        if quarter == "2025-Q1":
-            before = len(trend_store.get_trend_history("northwind"))
-            tools_impl.append_trend_entry(dict(nw_result["entry"]), caller={"agent": "trend-synthesizer", "agent_version": "v1"})
-            after = len(trend_store.get_trend_history("northwind"))
+        # Real idempotency proof — right after the real S01 write, call append_trend_entry a
+        # second time with the IDENTICAL entry and assert no duplicate.
+        if cycle == "2025-S01":
+            before = len(trend_store.get_trend_history("meridian"))
+            tools_impl.append_trend_entry(dict(mer_result["entry"]), caller={"agent": "change-impact-synthesizer", "agent_version": "v1"})
+            after = len(trend_store.get_trend_history("meridian"))
             assert before == after == 1, f"idempotency violated: {before} -> {after} records for the same key"
-            log(f"[idempotency]   duplicate append_trend_entry call for the SAME (company_id, quarter) -> "
+            log(f"[idempotency]   duplicate append_trend_entry call for the SAME (company_id, cycle) -> "
                 f"still exactly {after} record on file (real proof, not asserted in prose).")
 
-        so_script = SOLACE_SCRIPT[quarter]
-        # The model change persists forward from 2026-Q3 onward (realistic: a provider-side
-        # snapshot update doesn't revert) — so there's exactly ONE boundary (Q2 -> Q3), not a
-        # second spurious one when Q4 would otherwise revert to the old pin.
-        so_model_override = NEW_MODEL if quarter in ("2026-Q3", "2026-Q4") else None
-        so_result = orchestrator.run_pe_company_cycle(
-            company_id="solace", quarter=quarter,
-            pe_thesis_output=so_script["pe"], trend_synth_output=so_script["ts"], budget=budget_so,
-            model_override=so_model_override,
+        way_script = WAYFINDER_SCRIPT[cycle]
+        # The model change persists forward from S09 onward (realistic: a provider-side
+        # snapshot update doesn't revert) — so there's exactly ONE boundary (S08 -> S09).
+        way_model_override = NEW_MODEL if cycle in ("2025-S09", "2025-S10") else None
+        way_result = orchestrator.run_charter_company_cycle(
+            company_id="wayfinder", cycle=cycle,
+            goal_drift_output=way_script["goal_drift"], change_impact_output=way_script["change_impact"],
+            budget=budget_way, model_override=way_model_override,
         )
-        log(f"[solace]        {so_result['entry']['classification']:16s} | {so_result['entry']['rationale'][:110]}")
+        log(f"[wayfinder] {way_result['entry']['classification']:16s} | {way_result['entry']['rationale'][:110]}")
 
-        fp_script = FERROUS_POINT_SCRIPT[quarter]
-        fp_result = orchestrator.run_pd_company_cycle(
-            company_id="ferrous_point", quarter=quarter, covenant_field="total_net_leverage",
-            thresholds=FERROUS_THRESHOLDS, pd_trajectory_output=fp_script, budget=budget_fp,
+        cas_script = CASCADE_SCRIPT[cycle]
+        cas_result = orchestrator.run_slo_company_cycle(
+            company_id="cascade", cycle=cycle, metric_field="monthly_error_budget_consumed_pct",
+            thresholds=CASCADE_THRESHOLDS, slo_trajectory_output=cas_script, budget=budget_cas,
         )
-        log(f"[ferrous_point] {fp_result['entry']['classification']:16s} | {fp_result['entry']['rationale'][:110]}")
+        log(f"[cascade]   {cas_result['entry']['classification']:16s} | {cas_result['entry']['rationale'][:110]}")
 
-        company_results = {"northwind": nw_result, "solace": so_result, "ferrous_point": fp_result}
+        company_results = {"meridian": mer_result, "wayfinder": way_result, "cascade": cas_result}
 
-        # Model-boundary-interpreter's scripted judgment for Solace's Q3-2026 boundary.
+        # model-boundary-interpreter's scripted judgment for Wayfinder's S09 boundary.
         model_boundary_judgments = {}
-        if so_result["boundary_kind"] is not None:
-            model_boundary_judgments["solace"] = {
+        if way_result["boundary_kind"] is not None:
+            model_boundary_judgments["wayfinder"] = {
                 "judgment": "model_interpretation_noise",
                 "rationale": (
-                    "Revenue growth of 8.3% is within Solace's normal trailing range (8.0%-8.7%) "
-                    "and consistent with typical seasonal patient-volume softness. Nothing in the "
-                    "underlying financials indicates a real change in business trajectory; the "
-                    "classification shift is attributable to a difference in model interpretation "
-                    "at the pinned-model boundary, not to the business."
+                    "The underlying behavior_incidents and operational_health did not move in a way "
+                    "that indicates a real new violation — the booking's own session log confirms "
+                    "confirmation was captured before completion in both cycles. The classification "
+                    "shift is attributable to a difference in model interpretation at the pinned-model "
+                    "boundary, not to the monitored system's actual behavior."
                 ),
             }
 
         systemic_spike_counterfactuals = {}
-        if quarter == "2026-Q1":
-            systemic_spike_counterfactuals["northwind"] = NORTHWIND_Q1_2026_V2_COUNTERFACTUAL
+        if cycle == "2025-S06":
+            systemic_spike_counterfactuals["meridian"] = MERIDIAN_S06_V2_COUNTERFACTUAL
+            systemic_spike_counterfactuals["wayfinder"] = WAYFINDER_S06_V2_COUNTERFACTUAL
 
-        quarter_result = orchestrator.run_portfolio_quarter(
-            quarter=quarter, as_of_date=as_of, portfolio_size=PORTFOLIO_SIZE,
+        cycle_result = orchestrator.run_portfolio_cycle(
+            cycle=cycle, as_of_date=as_of, portfolio_size=PORTFOLIO_SIZE,
             company_cycle_results=company_results, model_boundary_judgments=model_boundary_judgments,
             systemic_spike_counterfactuals=systemic_spike_counterfactuals,
         )
 
-        if quarter_result["flagged_company_ids"]:
-            log(f"[risk] flagged this quarter: {quarter_result['flagged_company_ids']}")
-        for incident in quarter_result["incidents"]:
+        if cycle_result["flagged_company_ids"]:
+            log(f"[risk] flagged this cycle: {cycle_result['flagged_company_ids']}")
+        for incident in cycle_result["incidents"]:
             log(f"[incident] {incident['incident_id']} kind={incident['kind']} risk_tier={incident['risk_tier']} "
                 f"routing={incident['routing']} status={incident['status']}")
             if incident["kind"] == "systemic_flag_spike":
                 rollback_incident_id = incident["incident_id"]
-                active_after = registry.get_active("trend-synthesizer")
-                log(f"[rollback] trend-synthesizer active version after auto-rollback: {active_after['version']} "
+                active_after = registry.get_active("change-impact-synthesizer")
+                log(f"[rollback] change-impact-synthesizer active version after auto-rollback: {active_after['version']} "
                     f"(activated_by={active_after['activated_by']})")
             if incident["kind"] == "model_boundary_ambiguity":
                 boundary_incident_id = incident["incident_id"]
+            if incident["kind"] == "destructive_layer_change":
+                destructive_incident_id = incident["incident_id"]
+                log(f"[human_approval] {incident['incident_id']}: action_taken=False, status=pending_human_approval "
+                    f"— no automated action was, or ever will be, taken on this incident's own authority.")
 
-        # Credit Committee escalation check for Ferrous Point (deterministic policy_rules).
-        fp_history = tools_impl.get_trend_history("ferrous_point", limit=None,
-                                                    caller={"agent": "pd-covenant-tracker", "agent_version": "v1"})
-        cc_result = orchestrator.check_credit_committee_escalation("ferrous_point", quarter, as_of, fp_history)
-        if cc_result:
-            credit_committee_dispatch_quarter = quarter
-            log(f"[policy] Credit Committee reporting clause triggered ({policy_rules.count_consecutive_warning_quarters(fp_history)} "
-                f"consecutive warning quarters) — Jira + Confluence + Slack dispatched.")
+        # RRB escalation check for Cascade (deterministic policy_rules).
+        cas_history = tools_impl.get_trend_history("cascade", limit=None,
+                                                     caller={"agent": "slo-risk-tracker", "agent_version": "v1"})
+        rrb_result = orchestrator.check_rrb_escalation("cascade", cycle, as_of, cas_history)
+        if rrb_result:
+            rrb_dispatch_cycle = cycle
+            log(f"[policy] RRB reporting clause triggered ({policy_rules.count_consecutive_warning_cycles(cas_history)} "
+                f"consecutive warning cycles) — Jira + Confluence + Slack dispatched.")
 
         log()
 
     # Scripted human review of the model-boundary incident, confirming model-interpretation
-    # noise (not a real business change) — the feedback-loop write.
+    # noise (not a real behavior change) — the feedback-loop write.
     if boundary_incident_id:
         reviewed = incidents.record_human_review(
-            boundary_incident_id, resolved_by="jordan.lee@dealteam.example.com",
+            boundary_incident_id, resolved_by="priya.nair@platform-reliability.example.com",
             human_note=(
-                "Reviewed per policy's model-attributable-change clause. Solace's Q3-2026 revenue "
-                "growth of 8.3% is within normal trailing variance (8.0%-8.7%); confirmed as "
-                "model-interpretation noise, not a real business change. No escalation taken on "
-                "this classification alone. Will revisit if Q4 shows a genuine break."
+                "Reviewed per policy's model-attributable-change clause. Wayfinder's S09 finding "
+                "reproduces the same benign timestamp-ordering artifact seen at S06, now surfaced "
+                "under a new model snapshot; confirmed as model-interpretation noise, not a real "
+                "boundary violation. No escalation taken on this classification alone."
             ),
         )
         log(f"[human review] {boundary_incident_id} -> status={reviewed['status']}, resolved_by={reviewed['resolved_by']}")
 
+    # Scripted human approval decision on the destructive database-migration incident — the
+    # explicit, logged authorization this system requires before any such action proceeds.
+    if destructive_incident_id:
+        approved = incidents.record_approval_decision(
+            destructive_incident_id, "approved", decided_by="morgan.reyes@data-governance.example.com",
+            note=(
+                "Confirmed pre-approved by data governance; cold-storage migration of "
+                "raw_events_archive verified complete before the drop. Approved to proceed."
+            ),
+        )
+        log(f"[human approval] {destructive_incident_id} -> status={approved['status']}, resolved_by={approved['resolved_by']}")
+
     scenario_facts.update({
         "rollback_incident_id": rollback_incident_id,
         "boundary_incident_id": boundary_incident_id,
-        "credit_committee_dispatch_quarter": credit_committee_dispatch_quarter,
+        "destructive_incident_id": destructive_incident_id,
+        "rrb_dispatch_cycle": rrb_dispatch_cycle,
         "live_mode": notifications.is_live(),
     })
     facts_path = PROJECT_ROOT / "data" / "scenario_facts.json"
     facts_path.write_text(json.dumps(scenario_facts, indent=2), encoding="utf-8")
     log(f"=== Simulation complete. Scenario facts written to {facts_path.relative_to(PROJECT_ROOT)} ===")
     log(f"Rollback incident: {rollback_incident_id} | Model-boundary incident: {boundary_incident_id} | "
-        f"Credit Committee dispatch quarter: {credit_committee_dispatch_quarter}")
+        f"Destructive-change incident: {destructive_incident_id} | RRB dispatch cycle: {rrb_dispatch_cycle}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 {
   "rollback_incident_id": "INC-0002",
-  "boundary_incident_id": "INC-0003",
-  "credit_committee_dispatch_quarter": "2026-Q3",
-  "live_mode": true
+  "boundary_incident_id": "INC-0004",
+  "destructive_incident_id": "INC-0003",
+  "rrb_dispatch_cycle": "2025-S07",
+  "live_mode": false
 }

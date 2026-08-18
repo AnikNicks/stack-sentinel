@@ -1,0 +1,27 @@
+{
+  "incident_id": "INC-0001",
+  "detected_at": "2025-01-01",
+  "kind": "model_boundary_ambiguity",
+  "company_ids": [
+    "demo-fault-injection"
+  ],
+  "agent_version": "v2",
+  "model": "claude-sonnet-4-20250514",
+  "input_snapshot": {},
+  "output_snapshot": {},
+  "risk_tier": "critical",
+  "routing": "human_review",
+  "status": "pending_review",
+  "remediation_detail": "drill: simulated stale incident",
+  "resolved_by": null,
+  "human_note": null,
+  "counterfactual": null,
+  "escalation_log": [
+    {
+      "escalated_at": "2025-03-01",
+      "reason": "pending_review unresolved past 10 business days",
+      "new_risk_tier": "critical"
+    }
+  ],
+  "created_at": "2026-08-18T07:36:29.310249+00:00"
+}

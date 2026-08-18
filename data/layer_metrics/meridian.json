@@ -73,7 +73,7 @@
       "operational_health": {"error_rate_pct": 0.6, "p95_latency_ms": 950, "uptime_pct": 99.9},
       "behavior_incidents": [
         {
-          "description": "A support ticket noted the escalation banner took a couple of extra seconds to appear on a $210 refund request before correctly routing to human approval — a brief UI lag, not a missed escalation. The refund was never auto-completed.",
+          "description": "Compliance monitoring flagged that a $210 refund's completion timestamp in the audit log preceded its logged human-approval timestamp by roughly 2 seconds, on its face appearing to show the refund executing before approval was granted.",
           "boundary_violated": "Refunds over $200 must be routed to human approval before execution."
         }
       ]

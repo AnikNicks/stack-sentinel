@@ -1,0 +1,5 @@
+agent: portfolio-rollup-writer
+active_version: v1
+activated_by: initial-deployment
+activated_at: '2026-08-18T07:36:29.337141+00:00'
+reason: Initial production deployment.
