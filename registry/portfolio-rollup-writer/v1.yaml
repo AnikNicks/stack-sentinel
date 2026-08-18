@@ -1,6 +1,6 @@
 version: v1
 agent: portfolio-rollup-writer
-created: '2024-11-01'
+created: '2024-12-16'
 changelog: 'Initial release: synthesizes each company''s latest status into one portfolio-level
   report.'
 prompt_file: .claude/agents/portfolio-rollup-writer.md
@@ -8,5 +8,5 @@ tool_scope:
 - list_portfolio_companies
 - get_trend_history
 model: claude-sonnet-4-20250514
-objective_statement: Synthesize every company's current status into one report a deal
-  partner reads.
+objective_statement: Synthesize every company's current status into one report an
+  engineering leader reads.

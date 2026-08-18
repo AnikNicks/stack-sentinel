@@ -1,0 +1,13 @@
+version: v1
+agent: slo-risk-tracker
+created: '2024-12-16'
+changelog: 'Initial release: wraps deterministic error-budget math and judges trajectory
+  toward SLO thresholds, not just point-in-time pass/fail.'
+prompt_file: .claude/agents/slo-risk-tracker.md
+tool_scope:
+- get_slo_agreement
+- get_system_metrics
+- get_trend_history
+model: claude-sonnet-4-20250514
+objective_statement: Judge an SLO-tracked system's trajectory toward its error-budget
+  thresholds, using pre-computed deterministic values.

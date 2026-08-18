@@ -17,9 +17,9 @@ from mcp_server.server import mcp
 
 EXPECTED_TOOLS = {
     "list_portfolio_companies",
-    "get_investment_thesis",
-    "get_loan_agreement",
-    "get_financials",
+    "get_system_charter",
+    "get_slo_agreement",
+    "get_system_metrics",
     "get_trend_history",
     "append_trend_entry",
     "search_policy",

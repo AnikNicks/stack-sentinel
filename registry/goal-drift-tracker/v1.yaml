@@ -1,0 +1,14 @@
+version: v1
+agent: goal-drift-tracker
+created: '2025-01-06'
+changelog: 'Initial release: compares this cycle''s behavior_incidents against the
+  launch charter''s agent_behavior_boundaries and classifies on_charter / watch /
+  drifted.'
+prompt_file: .claude/agents/goal-drift-tracker.md
+tool_scope:
+- get_system_charter
+- get_system_metrics
+- get_trend_history
+model: claude-sonnet-4-20250514
+objective_statement: Judge whether a CHARTER-tracked system is still operating within
+  the behavior boundaries it launched with.

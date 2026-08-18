@@ -1,0 +1,11 @@
+version: v3
+agent: change-impact-synthesizer
+created: '2025-04-28'
+changelog: Tightened sensitivity to treat any layer change_event this cycle as plausibly
+  explanatory, to surface emerging issues earlier.
+prompt_file: .claude/agents/change-impact-synthesizer.md
+tool_scope:
+- get_trend_history
+model: claude-sonnet-4-20250514
+objective_statement: Judge whether this cycle's finding is attributable to a real
+  layer-change event or is noise, in the context of prior cycles.

@@ -1,6 +1,6 @@
 version: v1
 agent: policy-compliance-checker
-created: '2024-11-01'
+created: '2024-12-16'
 changelog: 'Initial release: checks a cycle''s proposed routing against vector-retrieved
   policy clauses, alongside the deterministic policy_rules checks.'
 prompt_file: .claude/agents/policy-compliance-checker.md

@@ -1,0 +1,11 @@
+version: v1
+agent: change-impact-synthesizer
+created: '2025-01-06'
+changelog: 'Initial release: flags a cycle''s classification as attributable if it
+  deviates and a layer change_event occurred this cycle, else noise.'
+prompt_file: .claude/agents/change-impact-synthesizer.md
+tool_scope:
+- get_trend_history
+model: claude-sonnet-4-20250514
+objective_statement: Judge whether this cycle's finding is attributable to a real
+  layer-change event or is noise, in the context of prior cycles.
