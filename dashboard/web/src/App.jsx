@@ -71,17 +71,196 @@ function SectionHeader({ eyebrow, title, description }) {
   );
 }
 
+function Modal({ title, subtitle, onClose, children }) {
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <h3>{title}</h3>
+            {subtitle && <p className="modal-subtitle">{subtitle}</p>}
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** A small line chart of error_rate_pct across cycles, with points colored by that
+ * cycle's status and clickable to drill into the full cycle record — the same
+ * "click a point on the graph to see the event" pattern a real monitoring tool uses. */
+function HealthChart({ entries, compact = false, onPointClick }) {
+  if (!entries || entries.length < 2) {
+    return <p className="muted chart-empty">Not enough cycles yet for a trend.</p>;
+  }
+  const W = 600;
+  const H = compact ? 56 : 130;
+  const padX = 10;
+  const padY = compact ? 8 : 18;
+  const values = entries.map((e) => e.metric_snapshot?.operational_health?.error_rate_pct ?? 0);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const stepX = (W - padX * 2) / (entries.length - 1);
+
+  const yFor = (v) => H - padY - ((v - min) / range) * (H - padY * 2);
+  const coords = values.map((v, i) => [padX + i * stepX, yFor(v)]);
+  const linePath = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const areaPath = `${linePath} L${coords[coords.length - 1][0].toFixed(1)},${H - padY} L${coords[0][0].toFixed(1)},${H - padY} Z`;
+
+  function statusFor(entry) {
+    const incidentCount = entry.metric_snapshot?.behavior_incidents?.length || 0;
+    const destructive = Object.values(entry.metric_snapshot?.layers || {}).some(
+      (l) => l.change_event && l.change_event.reversible === false
+    );
+    if (destructive) return "bad";
+    if (incidentCount > 0) return "warn";
+    return "ok";
+  }
+
+  return (
+    <div className={compact ? "health-chart health-chart-compact" : "health-chart"}>
+      {!compact && (
+        <div className="health-chart-legend">
+          <span>Error rate</span>
+          <span className="muted">{values[values.length - 1]}% latest</span>
+        </div>
+      )}
+      <svg viewBox={`0 0 ${W} ${H}`} className="health-chart-svg" style={{ width: "100%", height: "auto", display: "block" }}>
+        <path d={areaPath} className="health-chart-area" />
+        <path d={linePath} className="health-chart-line" />
+        {coords.map(([x, y], i) => {
+          const status = statusFor(entries[i]);
+          return (
+            <circle
+              key={entries[i].cycle}
+              cx={x}
+              cy={y}
+              r={compact ? 3 : 5}
+              className={`health-chart-point health-chart-point-${status}${onPointClick ? " clickable" : ""}`}
+              onClick={onPointClick ? () => onPointClick(entries[i]) : undefined}
+            >
+              {!compact && <title>{`${entries[i].cycle}: ${values[i]}% error rate — click for detail`}</title>}
+            </circle>
+          );
+        })}
+      </svg>
+      {!compact && (
+        <div className="health-chart-axis">
+          <span>{entries[0].cycle}</span>
+          <span>{entries[entries.length - 1].cycle}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Horizontal bar chart for count-by-label rollups (incidents by kind/tier). Each bar is a
+ * real button, clickable to drill into the matching incidents — same idea as clicking a
+ * category slice in a real observability dashboard. */
+function BarChart({ data, colorClassFor, onBarClick }) {
+  const entries = Object.entries(data || {});
+  if (entries.length === 0) return <p className="muted">None recorded yet.</p>;
+  const max = Math.max(...entries.map(([, v]) => v));
+  return (
+    <div className="bar-chart">
+      {entries.map(([label, value]) => (
+        <button key={label} className="bar-row" onClick={() => onBarClick(label)}>
+          <span className="bar-label mono">{label}</span>
+          <span className="bar-track">
+            <span
+              className={`bar-fill ${colorClassFor ? colorClassFor(label) : "bar-fill-accent"}`}
+              style={{ width: `${(value / max) * 100}%` }}
+            />
+          </span>
+          <span className="bar-value">{value}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CycleDetailModal({ company, entry, onClose }) {
+  const health = entry.metric_snapshot?.operational_health || {};
+  const layers = entry.metric_snapshot?.layers || {};
+  const incidents = entry.metric_snapshot?.behavior_incidents || [];
+  const changed = Object.entries(layers).filter(([, v]) => v.change_event);
+
+  return (
+    <Modal title={`${company.name} — ${entry.cycle}`} subtitle={company.sector} onClose={onClose}>
+      <div className="modal-row">
+        <StatusBadge classification={entry.classification} />
+        <span className="muted">classified by {entry.classifying_agent} {entry.agent_version} ({entry.model})</span>
+      </div>
+
+      <h4>Operational health</h4>
+      <div className="stat-row">
+        {Object.entries(health).map(([k, v]) => (
+          <div key={k} className="stat-chip">
+            <span className="stat-value">{v}</span>
+            <span className="stat-label mono">{k}</span>
+          </div>
+        ))}
+      </div>
+
+      <h4>Layer changes this cycle</h4>
+      {changed.length === 0 ? (
+        <p className="muted">None.</p>
+      ) : (
+        <ul className="detail-list">
+          {changed.map(([layer, v]) => (
+            <li key={layer}>
+              <span className={`layer-chip${v.change_event.reversible === false ? " layer-chip-bad" : ""}`}>{layer}</span>{" "}
+              {v.change_event.description}
+              {v.change_event.reversible === false && <strong className="bad-text"> — NON-REVERSIBLE</strong>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h4>Behavior incidents this cycle</h4>
+      {incidents.length === 0 ? (
+        <p className="muted">None.</p>
+      ) : (
+        <ul className="detail-list">
+          {incidents.map((inc, i) => (
+            <li key={i}>
+              {inc.description}
+              <div className="muted">boundary: {inc.boundary_violated}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h4>Rationale</h4>
+      <p className="modal-rationale">{entry.rationale}</p>
+    </Modal>
+  );
+}
+
 // ---------------------------------------------------------------------------
 
 function OverviewSection() {
   const { loading, error, data: companies } = useAsync(api.listCompanies, []);
-  const [latest, setLatest] = useState({});
+  const [recent, setRecent] = useState({});
 
   useEffect(() => {
     if (!companies) return;
     companies.forEach((c) => {
-      api.getTrend(c.company_id, 1).then((h) => {
-        setLatest((prev) => ({ ...prev, [c.company_id]: h[0] || null }));
+      api.getTrend(c.company_id, 6).then((h) => {
+        setRecent((prev) => ({ ...prev, [c.company_id]: h }));
       });
     });
   }, [companies]);
@@ -91,14 +270,15 @@ function OverviewSection() {
       <SectionHeader
         eyebrow="Portfolio"
         title="Overview"
-        description="Latest recorded classification for every monitored company."
+        description="Latest recorded classification for every monitored company, with a recent error-rate trend at a glance."
       />
       {error && <ErrorBanner error={error} />}
       {loading && <p className="muted">Loading portfolio…</p>}
       {companies && (
         <div className="card-grid">
           {companies.map((c) => {
-            const entry = latest[c.company_id];
+            const history = recent[c.company_id];
+            const entry = history?.[history.length - 1];
             return (
               <a href={`#company-${c.company_id}`} key={c.company_id} className="company-card">
                 <h3>{c.name}</h3>
@@ -112,6 +292,7 @@ function OverviewSection() {
                 ) : (
                   <p className="cycle-label">no data yet</p>
                 )}
+                {history && history.length >= 2 && <HealthChart entries={history} compact />}
               </a>
             );
           })}
@@ -123,7 +304,7 @@ function OverviewSection() {
 
 // ---------------------------------------------------------------------------
 
-function CompanyBlock({ company, incidents }) {
+function CompanyBlock({ company, incidents, onSelectCycle }) {
   const { data: trend } = useAsync(() => api.getTrend(company.company_id), [company.company_id]);
   const companyIncidents = (incidents || []).filter((i) => i.company_ids?.includes(company.company_id));
 
@@ -134,6 +315,10 @@ function CompanyBlock({ company, incidents }) {
         <span className="track-pill">{company.monitoring_track}</span>
       </div>
       <p className="muted">{company.sector}</p>
+
+      {trend && trend.length >= 2 && (
+        <HealthChart entries={trend} onPointClick={(entry) => onSelectCycle(company, entry)} />
+      )}
 
       {!trend || trend.length === 0 ? (
         <p className="muted">No cycles recorded yet.</p>
@@ -155,7 +340,11 @@ function CompanyBlock({ company, incidents }) {
                 const changed = Object.entries(layers).filter(([, v]) => v.change_event);
                 const incidentsCount = e.metric_snapshot?.behavior_incidents?.length || 0;
                 return (
-                  <tr key={e.cycle} className={incidentsCount ? "row-flagged" : ""}>
+                  <tr
+                    key={e.cycle}
+                    className={incidentsCount ? "row-flagged row-clickable" : "row-clickable"}
+                    onClick={() => onSelectCycle(company, e)}
+                  >
                     <td className="mono">{e.cycle}</td>
                     <td>
                       <StatusBadge classification={e.classification} />
@@ -188,22 +377,31 @@ function CompanyBlock({ company, incidents }) {
 function CompaniesSection() {
   const { loading, error, data: companies } = useAsync(api.listCompanies, []);
   const { data: incidents } = useAsync(() => api.listIncidents(), []);
+  const [selected, setSelected] = useState(null); // { company, entry }
 
   return (
     <section id="companies" className="page-section">
       <SectionHeader
         eyebrow="Detail"
         title="Companies"
-        description="Full cycle-by-cycle trend history for every monitored company."
+        description="Full cycle-by-cycle trend history for every monitored company. Click any point on a health chart, or any table row's cycle, for the full record."
       />
       {error && <ErrorBanner error={error} />}
       {loading && <p className="muted">Loading…</p>}
       {companies && (
         <div className="company-block-list">
           {companies.map((c) => (
-            <CompanyBlock key={c.company_id} company={c} incidents={incidents} />
+            <CompanyBlock
+              key={c.company_id}
+              company={c}
+              incidents={incidents}
+              onSelectCycle={(company, entry) => setSelected({ company, entry })}
+            />
           ))}
         </div>
+      )}
+      {selected && (
+        <CycleDetailModal company={selected.company} entry={selected.entry} onClose={() => setSelected(null)} />
       )}
     </section>
   );
@@ -353,14 +551,47 @@ function RegistrySection() {
 
 // ---------------------------------------------------------------------------
 
+const RISK_COLOR_CLASS = { critical: "bar-fill-bad", high: "bar-fill-warn", medium: "bar-fill-accent", low: "bar-fill-accent" };
+
+function IncidentDrilldownModal({ title, incidents, onClose }) {
+  return (
+    <Modal title={title} subtitle={`${incidents.length} incident(s)`} onClose={onClose}>
+      {incidents.length === 0 ? (
+        <p className="muted">None.</p>
+      ) : (
+        <ul className="detail-list">
+          {incidents.map((i) => (
+            <li key={i.incident_id}>
+              <strong className="mono">{i.incident_id}</strong> — {i.company_ids?.join(", ")}
+              <div className="muted">
+                risk={i.risk_tier} · routing={i.routing} · status={i.status}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
+  );
+}
+
 function SystemHealthSection() {
   const { loading, error, data } = useAsync(api.getMetrics, []);
+  const { data: incidents } = useAsync(() => api.listIncidents(), []);
+  const [drilldown, setDrilldown] = useState(null); // { title, incidents }
+
+  function showKind(kind) {
+    setDrilldown({ title: `Incidents — ${kind}`, incidents: (incidents || []).filter((i) => i.kind === kind) });
+  }
+  function showTier(tier) {
+    setDrilldown({ title: `Incidents — ${tier} risk`, incidents: (incidents || []).filter((i) => i.risk_tier === tier) });
+  }
+
   return (
     <section id="health" className="page-section">
       <SectionHeader
         eyebrow="Observability"
         title="System Health"
-        description="Read-only rollups over the trend store and incident log."
+        description="Read-only rollups over the trend store and incident log. Click any bar to drill into the matching incidents."
       />
       {error && <ErrorBanner error={error} />}
       {loading && <p className="muted">Loading…</p>}
@@ -368,11 +599,11 @@ function SystemHealthSection() {
         <div className="health-grid">
           <div className="health-card">
             <h4>Incidents by kind</h4>
-            <pre>{JSON.stringify(data.incident_rates.by_kind, null, 2)}</pre>
+            <BarChart data={data.incident_rates.by_kind} onBarClick={showKind} />
           </div>
           <div className="health-card">
             <h4>Incidents by risk tier</h4>
-            <pre>{JSON.stringify(data.incident_rates.by_risk_tier, null, 2)}</pre>
+            <BarChart data={data.incident_rates.by_risk_tier} colorClassFor={(l) => RISK_COLOR_CLASS[l] || "bar-fill-accent"} onBarClick={showTier} />
           </div>
           <div className="health-card health-card-wide">
             <h4>Human-approval turnaround</h4>
@@ -392,6 +623,9 @@ function SystemHealthSection() {
             <p className="muted">{data.companies_tracked.join(", ") || "none yet"}</p>
           </div>
         </div>
+      )}
+      {drilldown && (
+        <IncidentDrilldownModal title={drilldown.title} incidents={drilldown.incidents} onClose={() => setDrilldown(null)} />
       )}
     </section>
   );
