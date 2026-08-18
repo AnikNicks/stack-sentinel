@@ -32,6 +32,24 @@ from pulse import benchmarks, incidents, metrics, registry
 from pulse.paths import PROJECT_ROOT
 from pulse.retry import PermanentError
 
+
+def _load_dotenv(path: Path) -> None:
+    """Minimal `.env` loader — no python-dotenv dependency, real env vars always win. Mirrors
+    pulse/notifications.py's loader; kept separate since pulse/ has zero cross-module coupling
+    to dashboard/ by design. Loaded here so OPENAI_API_KEY (read by POST /ask below) is picked
+    up from the repo-root .env without needing it exported in the shell that starts uvicorn."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip())
+
+
+_load_dotenv(PROJECT_ROOT / ".env")
+
 _EXTERNAL_CALLER = {"agent": "dashboard-console", "agent_version": "external"}
 
 app = FastAPI(title="Stack Sentinel Console API", version="1.0.0")
