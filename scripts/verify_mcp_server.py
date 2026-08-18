@@ -23,6 +23,7 @@ EXPECTED_TOOLS = {
     "get_trend_history",
     "append_trend_entry",
     "search_policy",
+    "search_company_policy",
 }
 
 

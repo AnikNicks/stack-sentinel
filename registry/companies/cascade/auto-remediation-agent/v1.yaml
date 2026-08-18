@@ -1,0 +1,5 @@
+version: v1
+company_id: cascade
+agent: auto-remediation-agent
+created: '2025-01-06'
+changelog: Initial release.

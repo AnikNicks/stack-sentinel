@@ -21,7 +21,7 @@ SYSTEMIC_SPIKE_THRESHOLD = 2
 @dataclass
 class RiskFinding:
     kind: Literal["systemic_flag_spike", "model_boundary_ambiguity", "policy_violation",
-                   "destructive_layer_change"]
+                   "destructive_layer_change", "company_agent_regression"]
     risk_tier: RiskTier
     routing: Routing
     justification: str
@@ -127,6 +127,49 @@ def check_destructive_layer_change(
                 + (f" {detail}" if detail else "")
             ),
             detail={"layer": layer, "change_kind": change_kind},
+        )
+    return None
+
+
+def check_company_agent_regression(
+    risk_tier: RiskTier, company_id: str, agent: str, detail: str = "",
+) -> RiskFinding | None:
+    """The risk-tiered response to a flagged event on a MONITORED COMPANY's own internal
+    agent (e.g. Meridian's resolution-agent, Cascade's auto-remediation-agent) — the actual
+    subject of this system, distinct from check_model_boundary_ambiguity (which defends
+    Stack Sentinel's OWN classifiers).
+
+    low/medium risk: routed to auto_rollback — pulse/company_rollback.py reverts the agent
+    to its last known-good version with no human in the loop, the same reasoning as
+    check_systemic_flag_spike's auto-rollback (the prior version was already live and
+    known-good).
+    high/critical risk: routed to pending_human_approval — pulse/human_approval.py's gate is
+    called instead, and the agent is NOT rolled back until a human explicitly authorizes it
+    via pulse.incidents.record_approval_decision. This mirrors
+    check_destructive_layer_change's contract exactly: a high-risk company-agent action is
+    never auto-executed, full stop.
+    """
+    if risk_tier in ("low", "medium"):
+        return RiskFinding(
+            kind="company_agent_regression",
+            risk_tier=risk_tier,
+            routing="auto_rollback",
+            justification=(
+                f"{agent} ({company_id}) flagged {risk_tier}-risk — reverting to its last "
+                f"known-good version automatically, no human gate required. {detail}"
+            ),
+            detail={"company_id": company_id, "agent": agent},
+        )
+    if risk_tier in ("high", "critical"):
+        return RiskFinding(
+            kind="company_agent_regression",
+            risk_tier=risk_tier,
+            routing="pending_human_approval",
+            justification=(
+                f"{agent} ({company_id}) flagged {risk_tier}-risk — a rollback this severe is "
+                f"never auto-executed; routed for an explicit, logged human decision. {detail}"
+            ),
+            detail={"company_id": company_id, "agent": agent},
         )
     return None
 

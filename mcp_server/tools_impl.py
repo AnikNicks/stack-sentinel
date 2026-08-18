@@ -137,3 +137,13 @@ def search_policy(query: str, k: int = 3, *, caller: dict[str, str]) -> list[dic
     matches = call_with_retry(vector_store.search_policy, query, k=k)
     _log(caller, "search_policy", {"query": query, "k": k}, f"{len(matches)} matches")
     return matches
+
+
+def search_company_policy(company_id: str, query: str, k: int = 3, *, caller: dict[str, str]) -> list[dict[str, Any]]:
+    """Semantic search scoped to one company's own policy document — the monitoring system
+    checking a company's own rules, the same discipline goal-drift-tracker applies to that
+    company's own charter boundaries."""
+    _get_company_or_raise(company_id)
+    matches = call_with_retry(vector_store.search_company_policy, company_id, query, k=k)
+    _log(caller, "search_company_policy", {"company_id": company_id, "query": query, "k": k}, f"{len(matches)} matches")
+    return matches

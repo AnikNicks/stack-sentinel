@@ -1,0 +1,5 @@
+version: v1
+company_id: meridian
+agent: resolution-agent
+created: '2025-01-06'
+changelog: Initial release.

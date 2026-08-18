@@ -64,6 +64,24 @@ def test_routine_change_is_not_a_destructive_finding():
     assert risk_scoring.check_destructive_layer_change("no_change", "database") is None
 
 
+def test_company_agent_regression_low_medium_routes_to_auto_rollback():
+    for tier in ("low", "medium"):
+        finding = risk_scoring.check_company_agent_regression(tier, "meridian", "resolution-agent", "test")
+        assert finding is not None
+        assert finding.kind == "company_agent_regression"
+        assert finding.risk_tier == tier
+        assert finding.routing == "auto_rollback"
+        assert finding.detail == {"company_id": "meridian", "agent": "resolution-agent"}
+
+
+def test_company_agent_regression_high_critical_routes_to_pending_human_approval():
+    for tier in ("high", "critical"):
+        finding = risk_scoring.check_company_agent_regression(tier, "cascade", "auto-remediation-agent", "test")
+        assert finding is not None
+        assert finding.risk_tier == tier
+        assert finding.routing == "pending_human_approval"
+
+
 def test_assess_cycle_returns_all_firing_findings_together():
     findings = risk_scoring.assess_cycle(
         flagged_company_ids=["a", "b"], portfolio_size=3,

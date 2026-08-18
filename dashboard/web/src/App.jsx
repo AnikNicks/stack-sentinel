@@ -304,7 +304,82 @@ function OverviewSection() {
 
 // ---------------------------------------------------------------------------
 
-function CompanyBlock({ company, incidents, onSelectCycle }) {
+/** This company's charter (behavior boundaries) or SLO (error-budget thresholds) — whichever
+ * applies to its monitoring_track. This is what goal-drift-tracker / slo-risk-tracker check
+ * every cycle against; showing it inline is what makes a company's status legible without
+ * cross-referencing a separate doc. */
+function CompanyCharterPanel({ company }) {
+  const isCharter = company.monitoring_track === "CHARTER";
+  const { data } = useAsync(
+    () => (isCharter ? api.getCharter(company.company_id) : api.getSlo(company.company_id)),
+    [company.company_id]
+  );
+  if (!data) return null;
+  return (
+    <div className="charter-panel">
+      <p className="charter-summary">{data.summary}</p>
+      {isCharter ? (
+        <ul className="boundary-list">
+          {data.agent_behavior_boundaries.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="boundary-list">
+          {Object.entries(data.slos).map(([k, v]) => (
+            <li key={k}>
+              <span className="mono">{k}</span>:{" "}
+              {typeof v === "object" ? Object.entries(v).map(([k2, v2]) => `${k2}=${v2}`).join(", ") : String(v)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** This company's OWN internal agents (e.g. Cascade's auto-remediation-agent) — the actual
+ * subject of the risk-tiered rollback mechanism: low/medium-risk events auto-roll an agent
+ * back with no human in the loop; high/critical-risk events never roll back automatically.
+ * Distinct from the portfolio-wide Registry section below, which is Stack Sentinel's OWN six
+ * classifiers, not any company's agents. */
+function CompanyAgentsPanel({ companyId, refreshKey }) {
+  const { data: agents } = useAsync(() => api.getCompanyAgents(companyId), [companyId, refreshKey]);
+  if (!agents || agents.length === 0) return null;
+  return (
+    <div className="company-agents-grid">
+      {agents.map((a) => {
+        const auto = a.active?.activated_by;
+        const wasRolledBack = auto && auto !== "initial-deployment";
+        return (
+          <div key={a.agent} className={wasRolledBack ? "agent-card agent-card-rolled-back" : "agent-card"}>
+            <div className="agent-card-name mono">{a.agent}</div>
+            <div className="agent-card-version">
+              active <strong>{a.active?.version ?? "—"}</strong>
+              {a.versions.length > 1 && <span className="muted"> · {a.versions.length} versions on record</span>}
+            </div>
+            {wasRolledBack && <div className="agent-card-flag">rolled back — by {auto}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** This company's own policy document, read alongside (never instead of) the shared
+ * portfolio-wide policy in the Incidents section's governance rules. */
+function CompanyPolicyPanel({ companyId }) {
+  const { data } = useAsync(() => api.getCompanyPolicy(companyId), [companyId]);
+  if (!data) return null;
+  return (
+    <details className="policy-details">
+      <summary>Company policy</summary>
+      <pre className="policy-text">{data.markdown}</pre>
+    </details>
+  );
+}
+
+function CompanyBlock({ company, incidents, onSelectCycle, agentsRefreshKey }) {
   const { data: trend } = useAsync(() => api.getTrend(company.company_id), [company.company_id]);
   const companyIncidents = (incidents || []).filter((i) => i.company_ids?.includes(company.company_id));
 
@@ -316,6 +391,15 @@ function CompanyBlock({ company, incidents, onSelectCycle }) {
       </div>
       <p className="muted">{company.sector}</p>
 
+      <h4 className="company-subhead">{company.monitoring_track === "CHARTER" ? "Charter boundaries" : "SLO thresholds"}</h4>
+      <CompanyCharterPanel company={company} />
+
+      <h4 className="company-subhead">Internal agents</h4>
+      <CompanyAgentsPanel companyId={company.company_id} refreshKey={agentsRefreshKey} />
+
+      <CompanyPolicyPanel companyId={company.company_id} />
+
+      <h4 className="company-subhead">Operational health &amp; incidents</h4>
       {trend && trend.length >= 2 && (
         <HealthChart entries={trend} onPointClick={(entry) => onSelectCycle(company, entry)} />
       )}
@@ -374,7 +458,7 @@ function CompanyBlock({ company, incidents, onSelectCycle }) {
   );
 }
 
-function CompaniesSection() {
+function CompaniesSection({ agentsRefreshKey }) {
   const { loading, error, data: companies } = useAsync(api.listCompanies, []);
   const { data: incidents } = useAsync(() => api.listIncidents(), []);
   const [selected, setSelected] = useState(null); // { company, entry }
@@ -384,7 +468,7 @@ function CompaniesSection() {
       <SectionHeader
         eyebrow="Detail"
         title="Companies"
-        description="Full cycle-by-cycle trend history for every monitored company. Click any point on a health chart, or any table row's cycle, for the full record."
+        description="Everything about one monitored company in one place: its charter/SLO, its own internal agents and their rollback status, its own policy, and its full cycle-by-cycle history. Click any point on a health chart, or any table row's cycle, for the full record."
       />
       {error && <ErrorBanner error={error} />}
       {loading && <p className="muted">Loading…</p>}
@@ -396,6 +480,7 @@ function CompaniesSection() {
               company={c}
               incidents={incidents}
               onSelectCycle={(company, entry) => setSelected({ company, entry })}
+              agentsRefreshKey={agentsRefreshKey}
             />
           ))}
         </div>
@@ -409,7 +494,7 @@ function CompaniesSection() {
 
 // ---------------------------------------------------------------------------
 
-function IncidentsSection() {
+function IncidentsSection({ onDecisionRecorded }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const { loading, error, data: incidentList } = useAsync(() => api.listIncidents(), [refreshKey]);
   const [decidedBy, setDecidedBy] = useState("");
@@ -425,6 +510,7 @@ function IncidentsSection() {
     try {
       await api.recordDecision(incidentId, decision, decidedBy, note);
       setRefreshKey((k) => k + 1);
+      onDecisionRecorded?.();
     } catch (e) {
       alert("Failed: " + e.message);
     } finally {
@@ -537,8 +623,8 @@ function RegistrySection() {
     <section id="registry" className="page-section">
       <SectionHeader
         eyebrow="Versioning"
-        title="Registry"
-        description="Every agent's version history and which version is currently active."
+        title="Registry — Stack Sentinel's own agents"
+        description="Version history for Stack Sentinel's own six classifiers (the monitoring system itself). Each monitored company's OWN internal agents — with their own risk-tiered auto-rollback — are shown inline in that company's block in the Companies section above, not here."
       />
       <div className="registry-list">
         {AGENTS.map((a) => (
@@ -687,6 +773,7 @@ function AskSection() {
 
 export default function App() {
   const active = useActiveSection(SECTIONS.map((s) => s.id));
+  const [agentsRefreshKey, setAgentsRefreshKey] = useState(0);
 
   return (
     <div className="app-shell">
@@ -705,8 +792,8 @@ export default function App() {
 
       <main className="page-body">
         <OverviewSection />
-        <CompaniesSection />
-        <IncidentsSection />
+        <CompaniesSection agentsRefreshKey={agentsRefreshKey} />
+        <IncidentsSection onDecisionRecorded={() => setAgentsRefreshKey((k) => k + 1)} />
         <RegistrySection />
         <SystemHealthSection />
         <AskSection />

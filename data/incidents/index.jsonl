@@ -1,4 +1,6 @@
 {"incident_id": "INC-0001", "kind": "model_boundary_ambiguity", "status": "pending_review", "risk_tier": "high", "detected_at": "2025-01-01"}
-{"incident_id": "INC-0002", "kind": "systemic_flag_spike", "status": "auto_resolved", "risk_tier": "critical", "detected_at": "2025-03-25"}
-{"incident_id": "INC-0003", "kind": "destructive_layer_change", "status": "pending_human_approval", "risk_tier": "critical", "detected_at": "2025-04-22"}
-{"incident_id": "INC-0004", "kind": "model_boundary_ambiguity", "status": "pending_review", "risk_tier": "high", "detected_at": "2025-05-06"}
+{"incident_id": "INC-0002", "kind": "company_agent_regression", "status": "auto_resolved", "risk_tier": "low", "detected_at": "2025-02-11"}
+{"incident_id": "INC-0003", "kind": "company_agent_regression", "status": "pending_human_approval", "risk_tier": "high", "detected_at": "2025-03-11"}
+{"incident_id": "INC-0004", "kind": "systemic_flag_spike", "status": "auto_resolved", "risk_tier": "critical", "detected_at": "2025-03-25"}
+{"incident_id": "INC-0005", "kind": "destructive_layer_change", "status": "pending_human_approval", "risk_tier": "critical", "detected_at": "2025-04-22"}
+{"incident_id": "INC-0006", "kind": "model_boundary_ambiguity", "status": "pending_review", "risk_tier": "high", "detected_at": "2025-05-06"}

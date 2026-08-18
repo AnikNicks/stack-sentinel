@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from mcp_server import tools_impl
-from pulse import incidents, notifications, orchestrator, policy_rules, registry, retry, trend_store
+from pulse import company_registry, company_rollback, incidents, notifications, orchestrator, policy_rules, registry, retry, trend_store
 from pulse.paths import AUDIT_LOG_PATH, INCIDENTS_DIR, NOTIFICATIONS_LOG_PATH, PROJECT_ROOT, REGISTRY_DIR, TREND_STORE_DIR
 from pulse.retry import CallBudget
 
@@ -56,7 +56,7 @@ def reset_state() -> None:
     if NOTIFICATIONS_LOG_PATH.exists():
         NOTIFICATIONS_LOG_PATH.unlink()
     for agent_dir in REGISTRY_DIR.iterdir():
-        if not agent_dir.is_dir():
+        if not agent_dir.is_dir() or agent_dir == company_registry.COMPANY_REGISTRY_DIR:
             continue
         active = agent_dir / "active.yaml"
         activation_log = agent_dir / "activation_log.jsonl"
@@ -64,8 +64,23 @@ def reset_state() -> None:
             active.unlink()
         if activation_log.exists():
             activation_log.unlink()
-    log("Cleared trend_store, incidents, audit_log, notifications_log, and all active.yaml/activation_log files.")
-    log("(Registered version bundles v1/v2/v3 themselves are untouched — those are Phase 2 seed data.)\n")
+    # Same clear, one level deeper, for registry/companies/<company_id>/<agent>/.
+    if company_registry.COMPANY_REGISTRY_DIR.exists():
+        for company_dir in company_registry.COMPANY_REGISTRY_DIR.iterdir():
+            if not company_dir.is_dir():
+                continue
+            for agent_dir in company_dir.iterdir():
+                if not agent_dir.is_dir():
+                    continue
+                active = agent_dir / "active.yaml"
+                activation_log = agent_dir / "activation_log.jsonl"
+                if active.exists():
+                    active.unlink()
+                if activation_log.exists():
+                    activation_log.unlink()
+    log("Cleared trend_store, incidents, audit_log, notifications_log, and all active.yaml/activation_log files "
+        "(both Stack Sentinel's own agents and every monitored company's own agents).")
+    log("(Registered version bundles themselves are untouched — those are Phase 2 seed data.)\n")
 
 
 # ---------------------------------------------------------------------------------------
@@ -252,17 +267,27 @@ def main() -> None:
 
     run_fault_injection_drills()
 
-    log("=== Activating v1 for all 6 agents (2025-S01 baseline) ===")
+    log("=== Activating v1 for all 6 Stack Sentinel agents (2025-S01 baseline) ===")
     for agent in ["goal-drift-tracker", "slo-risk-tracker", "change-impact-synthesizer",
                   "model-boundary-interpreter", "portfolio-rollup-writer", "policy-compliance-checker"]:
         pointer = registry.activate(agent, "v1", activated_by="initial-deployment", reason="Initial production deployment.")
         log(f"  {agent} -> {pointer['active_version']} (by {pointer['activated_by']})")
     log()
 
+    log("=== Activating v1 for every MONITORED COMPANY's own internal agents (2025-S01 baseline) ===")
+    for company_id, agents in company_registry.COMPANY_AGENTS.items():
+        for agent in agents:
+            pointer = company_registry.activate(company_id, agent, "v1", activated_by="initial-deployment",
+                                                  reason="Initial production deployment.")
+            log(f"  {company_id}/{agent} -> {pointer['active_version']} (by {pointer['activated_by']})")
+    log()
+
     rollback_incident_id = None
     boundary_incident_id = None
     destructive_incident_id = None
     rrb_dispatch_cycle = None
+    company_agent_auto_rollback_incident_id = None
+    company_agent_pending_approval_incident_id = None
 
     for cycle in CYCLES:
         log(f"########## {cycle} ##########")
@@ -277,6 +302,16 @@ def main() -> None:
             pointer = registry.activate("change-impact-synthesizer", "v3", activated_by="engineering-lead",
                                          reason="Tightened short-term sensitivity — see registry/change-impact-synthesizer/v3.yaml changelog.")
             log(f"[registry] change-impact-synthesizer activated -> v3 (by {pointer['activated_by']}): innocuous-looking changelog.")
+
+        if cycle == "2025-S02":
+            pointer = company_registry.activate("meridian", "intake-triage-agent", "v2", activated_by="eng-lead",
+                                                  reason="Retuned ticket-routing prompt to reduce misroutes.")
+            log(f"[company registry] meridian/intake-triage-agent activated -> v2 (by {pointer['activated_by']}).")
+
+        if cycle == "2025-S04":
+            pointer = company_registry.activate("cascade", "auto-remediation-agent", "v2", activated_by="eng-lead",
+                                                  reason="Widened auto-remediation scope to include malformed-batch handling.")
+            log(f"[company registry] cascade/auto-remediation-agent activated -> v2 (by {pointer['activated_by']}).")
 
         budget_mer = CallBudget()
         budget_way = CallBudget()
@@ -361,6 +396,18 @@ def main() -> None:
                 destructive_incident_id = incident["incident_id"]
                 log(f"[human_approval] {incident['incident_id']}: action_taken=False, status=pending_human_approval "
                     f"— no automated action was, or ever will be, taken on this incident's own authority.")
+            if incident["kind"] == "company_agent_regression":
+                cid = incident["company_ids"][0]
+                agent = incident["input_snapshot"]["agent"]
+                if incident["routing"] == "auto_rollback":
+                    company_agent_auto_rollback_incident_id = incident["incident_id"]
+                    active_after = company_registry.get_active(cid, agent)
+                    log(f"[company rollback] {cid}/{agent} active version after auto-rollback: "
+                        f"{active_after['version']} (activated_by={active_after['activated_by']})")
+                else:
+                    company_agent_pending_approval_incident_id = incident["incident_id"]
+                    log(f"[human_approval] {incident['incident_id']}: {cid}/{agent} action_taken=False, "
+                        f"status=pending_human_approval — NOT rolled back until a human explicitly decides.")
 
         # RRB escalation check for Cascade (deterministic policy_rules).
         cas_history = tools_impl.get_trend_history("cascade", limit=None,
@@ -399,18 +446,47 @@ def main() -> None:
         )
         log(f"[human approval] {destructive_incident_id} -> status={approved['status']}, resolved_by={approved['resolved_by']}")
 
+    # Scripted human approval decision on the high-risk company-agent incident (Cascade's
+    # auto-remediation-agent). Unlike the destructive-migration case above, a rollback is
+    # inherently safe and reversible (it only reverts to a version that was already live and
+    # known-good) — so once a human has explicitly authorized it, this system CAN perform the
+    # rollback for real, which a destructive/irreversible action never can, even approved.
+    if company_agent_pending_approval_incident_id:
+        approved = incidents.record_approval_decision(
+            company_agent_pending_approval_incident_id, "approved",
+            decided_by="dana.kwon@platform-reliability.example.com",
+            note=(
+                "Confirmed: auto-remediation-agent v2's widened batch-truncation behavior is "
+                "not acceptable without a review step. Approved rollback to v1."
+            ),
+        )
+        log(f"[human approval] {company_agent_pending_approval_incident_id} -> "
+            f"status={approved['status']}, resolved_by={approved['resolved_by']}")
+        rollback_pointer = company_rollback.auto_rollback_company_agent(
+            "cascade", "auto-remediation-agent",
+            reason=f"Human-approved rollback following {company_agent_pending_approval_incident_id}.",
+            activated_by=approved["resolved_by"],
+        )
+        log(f"[company rollback] cascade/auto-remediation-agent rolled back to "
+            f"{rollback_pointer['active_version']} (activated_by={rollback_pointer['activated_by']}) "
+            f"— executed only after, and because of, the explicit human approval above.")
+
     scenario_facts.update({
         "rollback_incident_id": rollback_incident_id,
         "boundary_incident_id": boundary_incident_id,
         "destructive_incident_id": destructive_incident_id,
         "rrb_dispatch_cycle": rrb_dispatch_cycle,
+        "company_agent_auto_rollback_incident_id": company_agent_auto_rollback_incident_id,
+        "company_agent_pending_approval_incident_id": company_agent_pending_approval_incident_id,
         "live_mode": notifications.is_live(),
     })
     facts_path = PROJECT_ROOT / "data" / "scenario_facts.json"
     facts_path.write_text(json.dumps(scenario_facts, indent=2), encoding="utf-8")
     log(f"=== Simulation complete. Scenario facts written to {facts_path.relative_to(PROJECT_ROOT)} ===")
     log(f"Rollback incident: {rollback_incident_id} | Model-boundary incident: {boundary_incident_id} | "
-        f"Destructive-change incident: {destructive_incident_id} | RRB dispatch cycle: {rrb_dispatch_cycle}")
+        f"Destructive-change incident: {destructive_incident_id} | RRB dispatch cycle: {rrb_dispatch_cycle} | "
+        f"Company-agent auto-rollback: {company_agent_auto_rollback_incident_id} | "
+        f"Company-agent pending-approval: {company_agent_pending_approval_incident_id}")
 
 
 if __name__ == "__main__":

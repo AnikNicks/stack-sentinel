@@ -278,6 +278,21 @@ def dispatch_for_incident(incident: dict[str, Any]) -> list[dict[str, Any]]:
                              f"Incident {incident['incident_id']}."},
             incident_id=incident["incident_id"],
         ))
+    elif kind == "company_agent_regression":
+        agent = incident["input_snapshot"].get("agent", "unknown-agent")
+        if incident["routing"] == "auto_rollback":
+            text = (f"[Stack Sentinel] AUTO-ROLLBACK: {', '.join(company_ids)}/{agent} flagged "
+                    f"{incident['risk_tier']}-risk — auto-rolled back to its last known-good "
+                    f"version, no human gate required. Incident {incident['incident_id']}.")
+        else:
+            text = (f"[Stack Sentinel] BLOCKED — PENDING HUMAN APPROVAL: {', '.join(company_ids)}/{agent} "
+                    f"flagged {incident['risk_tier']}-risk — NOT rolled back automatically. An "
+                    f"explicit, logged human decision is required before anything proceeds. "
+                    f"Incident {incident['incident_id']}.")
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose="company_agent_regression",
+            detail={"text": text}, incident_id=incident["incident_id"],
+        ))
 
     records += _dispatch_universal_email_if_high_risk(
         company_id=",".join(company_ids), purpose=kind, risk_tier=incident["risk_tier"],

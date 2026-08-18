@@ -1,7 +1,9 @@
 {
-  "rollback_incident_id": "INC-0002",
-  "boundary_incident_id": "INC-0004",
-  "destructive_incident_id": "INC-0003",
+  "rollback_incident_id": "INC-0004",
+  "boundary_incident_id": "INC-0006",
+  "destructive_incident_id": "INC-0005",
   "rrb_dispatch_cycle": "2025-S07",
+  "company_agent_auto_rollback_incident_id": "INC-0002",
+  "company_agent_pending_approval_incident_id": "INC-0003",
   "live_mode": false
 }

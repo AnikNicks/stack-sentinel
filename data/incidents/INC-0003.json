@@ -1,31 +1,26 @@
 {
   "incident_id": "INC-0003",
-  "detected_at": "2025-04-22",
-  "kind": "destructive_layer_change",
+  "detected_at": "2025-03-11",
+  "kind": "company_agent_regression",
   "company_ids": [
     "cascade"
   ],
   "agent_version": "v1",
   "model": "claude-sonnet-4-20250514",
   "input_snapshot": {
-    "layer": "database",
-    "change_event": {
-      "type": "schema_migration",
-      "description": "Proposed migration: DROP TABLE raw_events_archive (4.2M rows) to reclaim storage ahead of a cold-storage cutover.",
-      "reversible": false
-    },
-    "from_version": "v2",
-    "to_version": "v3"
+    "company_id": "cascade",
+    "agent": "auto-remediation-agent",
+    "risk_tier": "high"
   },
   "output_snapshot": {},
-  "risk_tier": "critical",
+  "risk_tier": "high",
   "routing": "pending_human_approval",
   "status": "approved",
-  "remediation_detail": "Non-reversible change_event on the 'database' layer \u2014 per policy, any irreversible layer change must be routed to a human for an explicit, logged decision before any downstream action proceeds; it is never auto-executed.",
-  "resolved_by": "morgan.reyes@data-governance.example.com",
-  "human_note": "Confirmed pre-approved by data governance; cold-storage migration of raw_events_archive verified complete before the drop. Approved to proceed.",
+  "remediation_detail": "auto-remediation-agent (cascade) flagged high-risk \u2014 a rollback this severe is never auto-executed; routed for an explicit, logged human decision. auto-remediation-agent (v2) began auto-truncating malformed ingestion batches instead of quarantining them for review, a wider auto-remediation scope than it was authorized to exercise without a logged human sign-off.",
+  "resolved_by": "dana.kwon@platform-reliability.example.com",
+  "human_note": "Confirmed: auto-remediation-agent v2's widened batch-truncation behavior is not acceptable without a review step. Approved rollback to v1.",
   "counterfactual": null,
   "escalation_log": [],
-  "created_at": "2026-08-18T07:39:53.367119+00:00",
-  "reviewed_at": "2026-08-18T07:39:53.476317+00:00"
+  "created_at": "2026-08-18T15:14:36.562607+00:00",
+  "reviewed_at": "2026-08-18T15:14:36.851823+00:00"
 }

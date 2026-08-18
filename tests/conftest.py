@@ -27,6 +27,13 @@ def isolated_registry(tmp_path, monkeypatch):
 
 
 @pytest.fixture
+def isolated_company_registry(tmp_path, monkeypatch):
+    from pulse import company_registry
+    monkeypatch.setattr(company_registry, "COMPANY_REGISTRY_DIR", tmp_path / "registry" / "companies")
+    return company_registry
+
+
+@pytest.fixture
 def isolated_incidents(tmp_path, monkeypatch):
     from pulse import incidents
     incidents_dir = tmp_path / "incidents"

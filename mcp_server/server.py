@@ -91,5 +91,13 @@ def search_policy(query: str, k: int = 3) -> list[dict[str, Any]]:
     return tools_impl.search_policy(query, k, caller=_EXTERNAL_CALLER)
 
 
+@mcp.tool()
+def search_company_policy(company_id: str, query: str, k: int = 3) -> list[dict[str, Any]]:
+    """Semantic vector search scoped to ONE company's own policy document — a company's own
+    rules, checked the same way its charter boundaries are, never mixed with another
+    company's clauses."""
+    return tools_impl.search_company_policy(company_id, query, k, caller=_EXTERNAL_CALLER)
+
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")

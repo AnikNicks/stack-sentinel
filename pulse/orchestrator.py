@@ -20,6 +20,8 @@ from typing import Any
 
 from mcp_server import tools_impl
 from pulse import (
+    company_registry,
+    company_rollback,
     human_approval,
     incidents,
     layer_versioning,
@@ -104,6 +106,21 @@ def cycle_end_date(cycle: str):
     return base + timedelta(days=sprint_num * 14 - 1)
 
 
+def _detect_company_agent_findings(metrics: dict[str, Any], company_id: str) -> list[risk_scoring.RiskFinding]:
+    """The actual subject of monitoring: risk-tiered findings for the MONITORED COMPANY's own
+    internal agents (e.g. Meridian's resolution-agent), read straight off this cycle's
+    company_agent_events — never Stack Sentinel's own classifiers (see
+    pulse/risk_scoring.check_company_agent_regression's docstring for that distinction)."""
+    findings = []
+    for event in metrics.get("company_agent_events", []):
+        finding = risk_scoring.check_company_agent_regression(
+            event["risk_tier"], company_id, event["agent"], event.get("description", ""),
+        )
+        if finding is not None:
+            findings.append(finding)
+    return findings
+
+
 def _detect_destructive_events(
     previous_entry: dict[str, Any] | None, metrics: dict[str, Any],
 ) -> list[layer_versioning.LayerChangeEvent]:
@@ -156,6 +173,7 @@ def run_charter_company_cycle(
         errors += [f"change_impact_output: {e}" for e in schema_validator.validate(change_impact_output, CHANGE_IMPACT_SCHEMA)]
 
     destructive_events = _detect_destructive_events(previous_entry, metrics)
+    company_agent_findings = _detect_company_agent_findings(metrics, company_id)
 
     if errors:
         entry = tools_impl.append_trend_entry({
@@ -165,7 +183,7 @@ def run_charter_company_cycle(
             "rationale": "Assessment failed — ONE default applied, no retry: " + "; ".join(errors),
         }, caller=charter_caller)
         return {"entry": entry, "failed": True, "boundary_kind": None, "previous_entry": previous_entry,
-                "destructive_events": destructive_events}
+                "destructive_events": destructive_events, "company_agent_findings": company_agent_findings}
 
     final_classification = _combine_charter_classification(goal_drift_output["raw_classification"], change_impact_output["read"])
     entry = tools_impl.append_trend_entry({
@@ -197,7 +215,7 @@ def run_charter_company_cycle(
         )
 
     return {"entry": entry, "failed": False, "boundary_kind": boundary, "previous_entry": previous_entry,
-            "destructive_events": destructive_events}
+            "destructive_events": destructive_events, "company_agent_findings": company_agent_findings}
 
 
 def run_slo_company_cycle(
@@ -227,6 +245,7 @@ def run_slo_company_cycle(
         errors += [f"slo_trajectory_output: {e}" for e in schema_validator.validate(slo_trajectory_output, SLO_TRAJECTORY_SCHEMA)]
 
     destructive_events = _detect_destructive_events(previous_entry, metrics)
+    company_agent_findings = _detect_company_agent_findings(metrics, company_id)
 
     if errors:
         entry = tools_impl.append_trend_entry({
@@ -236,7 +255,7 @@ def run_slo_company_cycle(
             "rationale": "Assessment failed — ONE default applied, no retry: " + "; ".join(errors),
         }, caller=slo_caller)
         return {"entry": entry, "failed": True, "boundary_kind": None, "previous_entry": previous_entry,
-                "destructive_events": destructive_events}
+                "destructive_events": destructive_events, "company_agent_findings": company_agent_findings}
 
     value = metrics["operational_health"][metric_field]
     classification = classify_slo_status(value, thresholds)
@@ -257,7 +276,7 @@ def run_slo_company_cycle(
 
     boundary = model_boundary.detect_boundary(previous_entry, entry) if previous_entry else None
     return {"entry": entry, "failed": False, "boundary_kind": boundary, "previous_entry": previous_entry,
-            "destructive_events": destructive_events}
+            "destructive_events": destructive_events, "company_agent_findings": company_agent_findings}
 
 
 FLAGGED_CLASSIFICATIONS = {"drifted", "warning", "breach"}
@@ -365,6 +384,38 @@ def run_portfolio_cycle(
             # that the underlying action has NOT been taken and is pending a human decision.
             gate_result = human_approval.gate_destructive_action(finding.justification)
             assert gate_result["action_taken"] is False
+            cycle_incidents.append(incident)
+            cycle_notifications += notifications.dispatch_for_incident(incident)
+
+    # --- company-agent regression -> risk-tiered: low/medium auto-rolls-back the company's
+    # own agent with no human in the loop; high/critical is never auto-executed, gated for an
+    # explicit human decision instead. This is the actual subject of this system — versioning
+    # and rolling back the MONITORED COMPANIES' own agents, not Stack Sentinel's own six
+    # classifiers (those are defended separately, by model_boundary.py / systemic-flag-spike
+    # above, for a different reason: catching drift in Stack Sentinel's own judgment).
+    for cid, result in company_cycle_results.items():
+        for finding in result.get("company_agent_findings", []):
+            agent = finding.detail["agent"]
+            incident = incidents.create_incident(
+                kind=finding.kind, company_ids=[cid],
+                agent_version=result["entry"]["agent_version"], model=result["entry"]["model"],
+                input_snapshot={"company_id": cid, "agent": agent, "risk_tier": finding.risk_tier},
+                output_snapshot={},
+                risk_tier=finding.risk_tier, routing=finding.routing,
+                detected_at=as_of_date.isoformat(), remediation_detail=finding.justification,
+            )
+            if finding.routing == "auto_rollback":
+                rollback_pointer = company_rollback.auto_rollback_company_agent(cid, agent, reason=finding.justification)
+                incidents.record_human_review(
+                    incident["incident_id"], resolved_by=company_rollback.ROLLBACK_ACTOR,
+                    human_note=f"Auto-rolled back {cid}/{agent} to {rollback_pointer['active_version']}.",
+                    new_status="auto_resolved",
+                )
+            elif finding.routing == "pending_human_approval":
+                # human_approval.py never executes anything — this only formally records that
+                # the rollback has NOT happened and is pending an explicit human decision.
+                gate_result = human_approval.gate_destructive_action(finding.justification)
+                assert gate_result["action_taken"] is False
             cycle_incidents.append(incident)
             cycle_notifications += notifications.dispatch_for_incident(incident)
 

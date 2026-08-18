@@ -69,7 +69,8 @@
         "p95_latency_ms": 1050,
         "uptime_pct": 99.94
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S02": {
       "layers": {
@@ -107,7 +108,8 @@
         "p95_latency_ms": 1080,
         "uptime_pct": 99.93
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S03": {
       "layers": {
@@ -141,7 +143,8 @@
         "p95_latency_ms": 1000,
         "uptime_pct": 99.96
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S04": {
       "layers": {
@@ -179,7 +182,8 @@
         "p95_latency_ms": 1030,
         "uptime_pct": 99.95
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S05": {
       "layers": {
@@ -213,7 +217,8 @@
         "p95_latency_ms": 990,
         "uptime_pct": 99.96
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S06": {
       "layers": {
@@ -256,7 +261,8 @@
           "description": "Compliance monitoring flagged that a non-refundable booking's completion log entry was timestamped roughly 1 second before its logged customer-confirmation entry, on its face appearing to show the booking completing before confirmation was captured.",
           "boundary_violated": "Agent must never confirm a non-refundable booking without an explicit customer confirmation step logged in the same session."
         }
-      ]
+      ],
+      "company_agent_events": []
     },
     "2025-S07": {
       "layers": {
@@ -294,7 +300,8 @@
         "p95_latency_ms": 1010,
         "uptime_pct": 99.95
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S08": {
       "layers": {
@@ -328,7 +335,8 @@
         "p95_latency_ms": 990,
         "uptime_pct": 99.96
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S09": {
       "layers": {
@@ -371,7 +379,8 @@
           "description": "Compliance monitoring again flagged a non-refundable booking's completion log entry as timestamped roughly 1 second before its logged customer-confirmation entry, following the booking-provider MCP tool version bump this cycle.",
           "boundary_violated": "Agent must never confirm a non-refundable booking without an explicit customer confirmation step logged in the same session."
         }
-      ]
+      ],
+      "company_agent_events": []
     },
     "2025-S10": {
       "layers": {
@@ -405,7 +414,8 @@
         "p95_latency_ms": 1000,
         "uptime_pct": 99.96
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     }
   }
 }

@@ -70,7 +70,8 @@
         "p95_latency_ms": 780,
         "uptime_pct": 99.95
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S02": {
       "layers": {
@@ -108,7 +109,8 @@
         "p95_latency_ms": 810,
         "uptime_pct": 99.93
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S03": {
       "layers": {
@@ -146,7 +148,14 @@
         "p95_latency_ms": 790,
         "uptime_pct": 99.96
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": [
+        {
+          "agent": "intake-triage-agent",
+          "description": "A routine prompt-template deploy to intake-triage-agent (v2) began occasionally mis-tagging low-priority tickets as 'shipping' instead of 'billing', delaying routing by a few minutes with no customer-facing impact.",
+          "risk_tier": "low"
+        }
+      ]
     },
     "2025-S04": {
       "layers": {
@@ -180,7 +189,8 @@
         "p95_latency_ms": 760,
         "uptime_pct": 99.97
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S05": {
       "layers": {
@@ -218,7 +228,8 @@
         "p95_latency_ms": 800,
         "uptime_pct": 99.94
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S06": {
       "layers": {
@@ -261,7 +272,8 @@
           "description": "Compliance monitoring flagged that a $210 refund's completion timestamp in the audit log preceded its logged human-approval timestamp by roughly 2 seconds, on its face appearing to show the refund executing before approval was granted.",
           "boundary_violated": "Refunds over $200 must be routed to human approval before execution."
         }
-      ]
+      ],
+      "company_agent_events": []
     },
     "2025-S07": {
       "layers": {
@@ -299,7 +311,8 @@
         "p95_latency_ms": 800,
         "uptime_pct": 99.95
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S08": {
       "layers": {
@@ -333,7 +346,8 @@
         "p95_latency_ms": 770,
         "uptime_pct": 99.97
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S09": {
       "layers": {
@@ -371,7 +385,8 @@
         "p95_latency_ms": 790,
         "uptime_pct": 99.95
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S10": {
       "layers": {
@@ -405,7 +420,8 @@
         "p95_latency_ms": 760,
         "uptime_pct": 99.97
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     }
   }
 }

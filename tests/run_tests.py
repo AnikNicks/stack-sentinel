@@ -18,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pulse import (
     audit_log,
     benchmarks,
+    company_registry,
+    company_rollback,
     human_approval,
     incidents,
     layer_versioning,
@@ -64,6 +66,13 @@ def isolated_audit_log():
         log_path = Path(tmp) / "audit_log.jsonl"
         with patched(audit_log, "AUDIT_LOG_PATH", log_path), patched(audit_log, "ensure_data_dirs", lambda: None):
             yield audit_log
+
+
+@contextmanager
+def isolated_company_registry():
+    with tempfile.TemporaryDirectory() as tmp:
+        with patched(company_registry, "COMPANY_REGISTRY_DIR", Path(tmp) / "registry" / "companies"):
+            yield company_registry
 
 
 BASE_ENTRY = {
@@ -203,6 +212,31 @@ def _t14b():
     finding = risk_scoring.check_destructive_layer_change("destructive_change_candidate", "database")
     assert finding.routing == "pending_human_approval" and finding.risk_tier == "critical"
     assert risk_scoring.check_destructive_layer_change("routine_version_change", "database") is None
+
+
+@test("risk_scoring: company-agent regression low/medium -> auto_rollback, high/critical -> pending_human_approval")
+def _t14c():
+    for tier in ("low", "medium"):
+        finding = risk_scoring.check_company_agent_regression(tier, "meridian", "resolution-agent")
+        assert finding.routing == "auto_rollback" and finding.risk_tier == tier
+    for tier in ("high", "critical"):
+        finding = risk_scoring.check_company_agent_regression(tier, "cascade", "auto-remediation-agent")
+        assert finding.routing == "pending_human_approval" and finding.risk_tier == tier
+
+
+@test("company_registry + company_rollback: auto-rollback reverts a company's agent to its prior version")
+def _t14d():
+    with isolated_company_registry() as reg:
+        for v in ("v1", "v2"):
+            reg.register_new_version("cascade", "auto-remediation-agent", {
+                "version": v, "company_id": "cascade", "agent": "auto-remediation-agent",
+                "created": "2025-01-06", "changelog": "x",
+            })
+        reg.activate("cascade", "auto-remediation-agent", "v1", activated_by="initial-deployment")
+        reg.activate("cascade", "auto-remediation-agent", "v2", activated_by="eng-lead")
+        pointer = company_rollback.auto_rollback_company_agent("cascade", "auto-remediation-agent", reason="test")
+        assert pointer["active_version"] == "v1"
+        assert pointer["activated_by"] == company_rollback.ROLLBACK_ACTOR
 
 
 @test("risk_scoring: SLO-only flag across multiple cycles never triggers spike")

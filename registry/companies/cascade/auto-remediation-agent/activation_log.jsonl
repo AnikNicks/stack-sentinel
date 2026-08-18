@@ -1,0 +1,3 @@
+{"company_id": "cascade", "agent": "auto-remediation-agent", "active_version": "v1", "activated_by": "initial-deployment", "activated_at": "2026-08-18T15:14:36.328849+00:00", "reason": "Initial production deployment."}
+{"company_id": "cascade", "agent": "auto-remediation-agent", "active_version": "v2", "activated_by": "eng-lead", "activated_at": "2026-08-18T15:14:36.490077+00:00", "reason": "Widened auto-remediation scope to include malformed-batch handling."}
+{"company_id": "cascade", "agent": "auto-remediation-agent", "active_version": "v1", "activated_by": "dana.kwon@platform-reliability.example.com", "activated_at": "2026-08-18T15:14:36.859460+00:00", "reason": "Human-approved rollback following INC-0003."}

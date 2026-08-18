@@ -61,7 +61,8 @@
         "uptime_pct": 99.9,
         "monthly_error_budget_consumed_pct": 62
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S02": {
       "layers": {
@@ -100,7 +101,8 @@
         "uptime_pct": 99.88,
         "monthly_error_budget_consumed_pct": 68
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S03": {
       "layers": {
@@ -135,7 +137,8 @@
         "uptime_pct": 99.85,
         "monthly_error_budget_consumed_pct": 74
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S04": {
       "layers": {
@@ -174,7 +177,8 @@
         "uptime_pct": 99.82,
         "monthly_error_budget_consumed_pct": 79
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S05": {
       "layers": {
@@ -209,7 +213,14 @@
         "uptime_pct": 99.84,
         "monthly_error_budget_consumed_pct": 76
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": [
+        {
+          "agent": "auto-remediation-agent",
+          "description": "auto-remediation-agent (v2) began auto-truncating malformed ingestion batches instead of quarantining them for review, a wider auto-remediation scope than it was authorized to exercise without a logged human sign-off.",
+          "risk_tier": "high"
+        }
+      ]
     },
     "2025-S06": {
       "layers": {
@@ -248,7 +259,8 @@
         "uptime_pct": 99.78,
         "monthly_error_budget_consumed_pct": 82
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S07": {
       "layers": {
@@ -287,7 +299,8 @@
         "uptime_pct": 99.7,
         "monthly_error_budget_consumed_pct": 91
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S08": {
       "layers": {
@@ -326,7 +339,8 @@
         "uptime_pct": 99.71,
         "monthly_error_budget_consumed_pct": 95
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S09": {
       "layers": {
@@ -365,7 +379,8 @@
         "uptime_pct": 99.8,
         "monthly_error_budget_consumed_pct": 85
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     },
     "2025-S10": {
       "layers": {
@@ -400,7 +415,8 @@
         "uptime_pct": 99.85,
         "monthly_error_budget_consumed_pct": 80
       },
-      "behavior_incidents": []
+      "behavior_incidents": [],
+      "company_agent_events": []
     }
   }
 }

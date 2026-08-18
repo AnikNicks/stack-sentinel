@@ -3,10 +3,13 @@ directly over pulse/* and mcp_server/tools_impl.py, no new business logic of its
 endpoint below either calls an existing function unchanged or wraps it in a plain HTTP
 response — the deterministic core stays exactly as tested by pytest/tests/run_tests.py.
 
-This is the one place in the whole system with a real write action exposed to a human:
-POST /incidents/{id}/decision, which only ever calls pulse.incidents.record_approval_decision
-(or record_human_review) — it never touches pulse/human_approval.py's gate, and it can never
-trigger the underlying destructive action itself, only record a human's decision about it.
+This is the one place in the whole system with real write actions exposed to a human:
+POST /incidents/{id}/decision always calls pulse.incidents.record_approval_decision, and for
+exactly one incident kind — an APPROVED company_agent_regression — also performs the real
+rollback (see pulse/company_rollback.py; a version rollback is safe and reversible by
+construction, unlike a destructive change). Every other kind (e.g. destructive_layer_change)
+only ever gets its decision recorded; the underlying action stays permanently outside this
+system's authority, per pulse/human_approval.py's contract.
 
 Local-only by design: no auth, no deployment target, CORS open to localhost only. Run with
 `uvicorn dashboard.api.main:app --reload` from the repo root (needs the repo root on
@@ -28,7 +31,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from mcp_server import tools_impl
-from pulse import benchmarks, incidents, metrics, registry
+from pulse import benchmarks, company_registry, company_rollback, incidents, metrics, registry, vector_store
 from pulse.paths import PROJECT_ROOT
 from pulse.retry import PermanentError
 
@@ -96,6 +99,34 @@ def get_slo(company_id: str) -> dict[str, Any]:
         raise HTTPException(404, str(exc)) from exc
 
 
+@app.get("/companies/{company_id}/agents")
+def get_company_agents(company_id: str) -> list[dict[str, Any]]:
+    """Every internal agent this company runs, with its active version and full version
+    history — the actual subject of this system's monitoring, distinct from GET /registry/
+    (Stack Sentinel's own six classifiers)."""
+    _get_company_or_404(company_id)
+    agents = company_registry.COMPANY_AGENTS.get(company_id, [])
+    return [
+        {
+            "agent": agent,
+            "active": company_registry.get_active(company_id, agent),
+            "versions": company_registry.list_versions(company_id, agent),
+        }
+        for agent in agents
+    ]
+
+
+@app.get("/companies/{company_id}/policy")
+def get_company_policy(company_id: str) -> dict[str, str]:
+    """The raw markdown text of this company's own policy document — read alongside (never
+    instead of) the shared portfolio-wide policy."""
+    _get_company_or_404(company_id)
+    path = vector_store.company_policy_path(company_id)
+    if not path.exists():
+        raise HTTPException(404, f"no policy document for company_id '{company_id}'")
+    return {"company_id": company_id, "markdown": path.read_text(encoding="utf-8")}
+
+
 @app.get("/incidents")
 def list_incidents_endpoint(status: str | None = None, kind: str | None = None) -> list[dict[str, Any]]:
     return incidents.list_incidents(status=status, kind=kind)
@@ -117,13 +148,26 @@ class DecisionRequest(BaseModel):
 
 @app.post("/incidents/{incident_id}/decision")
 def record_decision(incident_id: str, body: DecisionRequest) -> dict[str, Any]:
-    """The ONLY write endpoint in this whole app. Only ever calls
-    pulse.incidents.record_approval_decision — never the underlying action itself, which no
-    code path in this repository can execute (see pulse/human_approval.py)."""
+    """The ONLY write endpoint in this whole app that can trigger a real action, and it does
+    so in exactly one narrow case: an APPROVED company_agent_regression incident (a version
+    rollback, which is safe and reversible by construction — see
+    pulse/company_rollback.py) is actually rolled back here, attributed to the human who
+    approved it. Every other incident kind (e.g. destructive_layer_change) only ever gets
+    its decision recorded — the underlying action stays permanently outside this system's
+    authority, per pulse/human_approval.py's contract."""
     try:
-        return incidents.record_approval_decision(incident_id, body.decision, body.decided_by, body.note)
+        bundle = incidents.record_approval_decision(incident_id, body.decision, body.decided_by, body.note)
     except incidents.IncidentError as exc:
         raise HTTPException(404, str(exc)) from exc
+
+    if bundle["kind"] == "company_agent_regression" and body.decision == "approved":
+        snap = bundle["input_snapshot"]
+        company_rollback.auto_rollback_company_agent(
+            snap["company_id"], snap["agent"],
+            reason=f"Human-approved rollback following {incident_id}.",
+            activated_by=body.decided_by,
+        )
+    return bundle
 
 
 @app.get("/registry/{agent}")
