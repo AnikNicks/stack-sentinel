@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { api, AGENTS } from "./api";
 import "./App.css";
 
-const TABS = ["Overview", "Company", "Incidents", "Registry", "System Health", "Ask"];
+const SECTIONS = [
+  { id: "overview", label: "Overview" },
+  { id: "companies", label: "Companies" },
+  { id: "incidents", label: "Incidents" },
+  { id: "registry", label: "Registry" },
+  { id: "health", label: "System Health" },
+  { id: "ask", label: "Ask" },
+];
 
 function useAsync(fn, deps) {
   const [state, setState] = useState({ loading: true, error: null, data: null });
@@ -20,6 +27,25 @@ function useAsync(fn, deps) {
   return state;
 }
 
+function useActiveSection(ids) {
+  const [active, setActive] = useState(ids[0]);
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) setActive(entry.target.id);
+        });
+      },
+      { rootMargin: "-35% 0px -55% 0px", threshold: 0 }
+    );
+    const els = ids.map((id) => document.getElementById(id)).filter(Boolean);
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return active;
+}
+
 function StatusBadge({ classification }) {
   const cls = classification || "unknown";
   return <span className={`badge badge-${cls}`}>{cls}</span>;
@@ -29,13 +55,25 @@ function ErrorBanner({ error }) {
   if (!error) return null;
   return (
     <div className="error-banner">
-      Could not reach the console API at http://127.0.0.1:8000 — is{" "}
+      Could not reach the console API at <code>http://127.0.0.1:8000</code> — is{" "}
       <code>uvicorn dashboard.api.main:app --reload</code> running? ({error.message})
     </div>
   );
 }
 
-function OverviewPage({ onSelectCompany }) {
+function SectionHeader({ eyebrow, title, description }) {
+  return (
+    <div className="section-header">
+      {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+      <h2>{title}</h2>
+      {description && <p className="section-description">{description}</p>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function OverviewSection() {
   const { loading, error, data: companies } = useAsync(api.listCompanies, []);
   const [latest, setLatest] = useState({});
 
@@ -48,131 +86,137 @@ function OverviewPage({ onSelectCompany }) {
     });
   }, [companies]);
 
-  if (error) return <ErrorBanner error={error} />;
-  if (loading) return <p>Loading portfolio...</p>;
-
   return (
-    <div className="card-grid">
-      {companies.map((c) => {
-        const entry = latest[c.company_id];
-        return (
-          <div
-            key={c.company_id}
-            className="company-card"
-            onClick={() => onSelectCompany(c.company_id)}
-          >
-            <h3>{c.name}</h3>
-            <p className="sector">{c.sector}</p>
-            <p className="track">{c.monitoring_track}-tracked</p>
-            {entry ? (
-              <>
-                <StatusBadge classification={entry.classification} />
-                <p className="cycle-label">as of {entry.cycle}</p>
-              </>
-            ) : (
-              <p className="cycle-label">no data yet</p>
-            )}
-          </div>
-        );
-      })}
-    </div>
+    <section id="overview" className="page-section">
+      <SectionHeader
+        eyebrow="Portfolio"
+        title="Overview"
+        description="Latest recorded classification for every monitored company."
+      />
+      {error && <ErrorBanner error={error} />}
+      {loading && <p className="muted">Loading portfolio…</p>}
+      {companies && (
+        <div className="card-grid">
+          {companies.map((c) => {
+            const entry = latest[c.company_id];
+            return (
+              <a href={`#company-${c.company_id}`} key={c.company_id} className="company-card">
+                <h3>{c.name}</h3>
+                <p className="sector">{c.sector}</p>
+                <p className="track">{c.monitoring_track}-tracked</p>
+                {entry ? (
+                  <>
+                    <StatusBadge classification={entry.classification} />
+                    <p className="cycle-label">as of {entry.cycle}</p>
+                  </>
+                ) : (
+                  <p className="cycle-label">no data yet</p>
+                )}
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
-function CompanyPage({ companyId, onSelectCompany }) {
-  const { loading, error, data: companies } = useAsync(api.listCompanies, []);
-  const active = companyId || companies?.[0]?.company_id;
-  const { data: trend } = useAsync(
-    () => (active ? api.getTrend(active) : Promise.resolve([])),
-    [active]
-  );
-  const { data: incidents } = useAsync(api.listIncidents.bind(null, undefined), []);
+// ---------------------------------------------------------------------------
 
-  if (error) return <ErrorBanner error={error} />;
-  if (loading) return <p>Loading...</p>;
-
-  const companyIncidents = (incidents || []).filter((i) =>
-    Object.values(i.company_ids || []).includes(active) || i.company_ids?.includes(active)
-  );
+function CompanyBlock({ company, incidents }) {
+  const { data: trend } = useAsync(() => api.getTrend(company.company_id), [company.company_id]);
+  const companyIncidents = (incidents || []).filter((i) => i.company_ids?.includes(company.company_id));
 
   return (
-    <div>
-      <div className="tab-strip">
-        {companies?.map((c) => (
-          <button
-            key={c.company_id}
-            className={c.company_id === active ? "chip chip-active" : "chip"}
-            onClick={() => onSelectCompany(c.company_id)}
-          >
-            {c.name}
-          </button>
-        ))}
+    <div id={`company-${company.company_id}`} className="company-block">
+      <div className="company-block-header">
+        <h3>{company.name}</h3>
+        <span className="track-pill">{company.monitoring_track}</span>
       </div>
+      <p className="muted">{company.sector}</p>
+
       {!trend || trend.length === 0 ? (
-        <p>No cycles recorded yet for {active}.</p>
+        <p className="muted">No cycles recorded yet.</p>
       ) : (
-        <table className="trend-table">
-          <thead>
-            <tr>
-              <th>Cycle</th>
-              <th>Classification</th>
-              <th>Behavior incidents</th>
-              <th>Layer changes this cycle</th>
-              <th>Rationale</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...trend].reverse().map((e) => {
-              const layers = e.metric_snapshot?.layers || {};
-              const changed = Object.entries(layers).filter(([, v]) => v.change_event);
-              const incidentsCount = e.metric_snapshot?.behavior_incidents?.length || 0;
-              return (
-                <tr key={e.cycle}>
-                  <td>{e.cycle}</td>
-                  <td>
-                    <StatusBadge classification={e.classification} />
-                  </td>
-                  <td>{incidentsCount}</td>
-                  <td>
-                    {changed.length === 0
-                      ? "—"
-                      : changed.map(([layer]) => layer).join(", ")}
-                  </td>
-                  <td className="rationale-cell">{e.rationale}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table className="trend-table">
+            <thead>
+              <tr>
+                <th>Cycle</th>
+                <th>Classification</th>
+                <th>Incidents</th>
+                <th>Layer changes</th>
+                <th>Rationale</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...trend].reverse().map((e) => {
+                const layers = e.metric_snapshot?.layers || {};
+                const changed = Object.entries(layers).filter(([, v]) => v.change_event);
+                const incidentsCount = e.metric_snapshot?.behavior_incidents?.length || 0;
+                return (
+                  <tr key={e.cycle} className={incidentsCount ? "row-flagged" : ""}>
+                    <td className="mono">{e.cycle}</td>
+                    <td>
+                      <StatusBadge classification={e.classification} />
+                    </td>
+                    <td>{incidentsCount}</td>
+                    <td>{changed.length === 0 ? "—" : changed.map(([layer]) => layer).join(", ")}</td>
+                    <td className="rationale-cell">{e.rationale}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
-      <h4>Incidents involving {active}</h4>
-      {companyIncidents.length === 0 ? (
-        <p>None on record.</p>
-      ) : (
-        <ul className="incident-mini-list">
+
+      {companyIncidents.length > 0 && (
+        <div className="mini-incidents">
+          <span className="mini-incidents-label">Incidents:</span>
           {companyIncidents.map((i) => (
-            <li key={i.incident_id}>
-              <strong>{i.incident_id}</strong> — {i.kind} ({i.status})
-            </li>
+            <span key={i.incident_id} className="mini-incident-chip">
+              {i.incident_id} · {i.kind} · {i.status}
+            </span>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );
 }
 
-function IncidentsPage() {
-  const [refreshKey, setRefreshKey] = useState(0);
-  const { loading, error, data: incidentList } = useAsync(
-    () => api.listIncidents(),
-    [refreshKey]
+function CompaniesSection() {
+  const { loading, error, data: companies } = useAsync(api.listCompanies, []);
+  const { data: incidents } = useAsync(() => api.listIncidents(), []);
+
+  return (
+    <section id="companies" className="page-section">
+      <SectionHeader
+        eyebrow="Detail"
+        title="Companies"
+        description="Full cycle-by-cycle trend history for every monitored company."
+      />
+      {error && <ErrorBanner error={error} />}
+      {loading && <p className="muted">Loading…</p>}
+      {companies && (
+        <div className="company-block-list">
+          {companies.map((c) => (
+            <CompanyBlock key={c.company_id} company={c} incidents={incidents} />
+          ))}
+        </div>
+      )}
+    </section>
   );
+}
+
+// ---------------------------------------------------------------------------
+
+function IncidentsSection() {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const { loading, error, data: incidentList } = useAsync(() => api.listIncidents(), [refreshKey]);
   const [decidedBy, setDecidedBy] = useState("");
   const [note, setNote] = useState("");
   const [busyId, setBusyId] = useState(null);
-
-  if (error) return <ErrorBanner error={error} />;
-  if (loading) return <p>Loading incidents...</p>;
 
   async function decide(incidentId, decision) {
     if (!decidedBy.trim()) {
@@ -191,138 +235,171 @@ function IncidentsPage() {
   }
 
   return (
-    <div>
-      <div className="decision-form">
-        <input
-          placeholder="decided_by (your name/email)"
-          value={decidedBy}
-          onChange={(e) => setDecidedBy(e.target.value)}
-        />
-        <input
-          placeholder="note (why)"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-      </div>
-      <table className="incidents-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Kind</th>
-            <th>Companies</th>
-            <th>Risk</th>
-            <th>Routing</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {incidentList.map((i) => (
-            <tr key={i.incident_id}>
-              <td>{i.incident_id}</td>
-              <td>{i.kind}</td>
-              <td>{i.company_ids?.join(", ")}</td>
-              <td>
-                <span className={`risk risk-${i.risk_tier}`}>{i.risk_tier}</span>
-              </td>
-              <td>{i.routing}</td>
-              <td>{i.status}</td>
-              <td>
-                {i.status === "pending_human_approval" ? (
-                  <>
-                    <button
-                      disabled={busyId === i.incident_id}
-                      onClick={() => decide(i.incident_id, "approved")}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      disabled={busyId === i.incident_id}
-                      onClick={() => decide(i.incident_id, "rejected")}
-                    >
-                      Reject
-                    </button>
-                  </>
-                ) : (
-                  <em>—</em>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function RegistryPage() {
-  const [agent, setAgent] = useState(AGENTS[2]);
-  const { loading, error, data } = useAsync(() => api.getRegistry(agent), [agent]);
-
-  return (
-    <div>
-      <div className="tab-strip">
-        {AGENTS.map((a) => (
-          <button
-            key={a}
-            className={a === agent ? "chip chip-active" : "chip"}
-            onClick={() => setAgent(a)}
-          >
-            {a}
-          </button>
-        ))}
-      </div>
+    <section id="incidents" className="page-section">
+      <SectionHeader
+        eyebrow="Governance"
+        title="Incidents"
+        description="Every incident on record. The only write action in this app lives here — Approve or Reject on any incident still pending_human_approval."
+      />
       {error && <ErrorBanner error={error} />}
-      {loading && <p>Loading...</p>}
-      {data && (
+      {loading && <p className="muted">Loading incidents…</p>}
+      {incidentList && (
         <>
-          <p>
-            Active version: <strong>{data.active?.version}</strong> (activated by{" "}
-            {data.active?.activated_by})
-          </p>
-          <ul className="version-list">
-            {data.versions.map((v) => (
-              <li key={v.version} className={v.version === data.active?.version ? "version-active" : ""}>
-                <strong>{v.version}</strong> ({v.created}) — {v.changelog}
-              </li>
-            ))}
-          </ul>
+          <div className="decision-form">
+            <input
+              placeholder="decided_by (your name/email)"
+              value={decidedBy}
+              onChange={(e) => setDecidedBy(e.target.value)}
+            />
+            <input placeholder="note (why)" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+          <div className="table-scroll">
+            <table className="incidents-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Kind</th>
+                  <th>Companies</th>
+                  <th>Risk</th>
+                  <th>Routing</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incidentList.map((i) => (
+                  <tr key={i.incident_id}>
+                    <td className="mono">{i.incident_id}</td>
+                    <td>{i.kind}</td>
+                    <td>{i.company_ids?.join(", ")}</td>
+                    <td>
+                      <span className={`risk risk-${i.risk_tier}`}>{i.risk_tier}</span>
+                    </td>
+                    <td>{i.routing}</td>
+                    <td>{i.status}</td>
+                    <td className="action-cell">
+                      {i.status === "pending_human_approval" ? (
+                        <>
+                          <button disabled={busyId === i.incident_id} onClick={() => decide(i.incident_id, "approved")}>
+                            Approve
+                          </button>
+                          <button
+                            className="btn-secondary"
+                            disabled={busyId === i.incident_id}
+                            onClick={() => decide(i.incident_id, "rejected")}
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        <em className="muted">—</em>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
-    </div>
+    </section>
   );
 }
 
-function SystemHealthPage() {
-  const { loading, error, data } = useAsync(api.getMetrics, []);
-  if (error) return <ErrorBanner error={error} />;
-  if (loading) return <p>Loading...</p>;
+// ---------------------------------------------------------------------------
+
+function RegistryAgentBlock({ agent }) {
+  const { data } = useAsync(() => api.getRegistry(agent), [agent]);
   return (
-    <div>
-      <h4>Incidents by kind</h4>
-      <pre>{JSON.stringify(data.incident_rates.by_kind, null, 2)}</pre>
-      <h4>Incidents by risk tier</h4>
-      <pre>{JSON.stringify(data.incident_rates.by_risk_tier, null, 2)}</pre>
-      <h4>Human-approval turnaround</h4>
-      {data.approval_turnaround.length === 0 ? (
-        <p>No decided approvals yet.</p>
-      ) : (
-        <ul>
-          {data.approval_turnaround.map((a) => (
-            <li key={a.incident_id}>
-              {a.incident_id}: {a.status} in {a.business_days_elapsed} business day(s){" "}
-              {a.within_sla ? "(within SLA)" : "(SLA breached)"}
+    <div className="registry-block">
+      <div className="registry-block-header">
+        <h3 className="mono">{agent}</h3>
+        {data?.active && (
+          <span className="active-pill">
+            active: {data.active.version} <span className="muted">by {data.active.activated_by}</span>
+          </span>
+        )}
+      </div>
+      {data && (
+        <ul className="version-list">
+          {data.versions.map((v) => (
+            <li key={v.version} className={v.version === data.active?.version ? "version-active" : ""}>
+              <strong className="mono">{v.version}</strong>{" "}
+              <span className="muted">({v.created})</span> — {v.changelog}
             </li>
           ))}
         </ul>
       )}
-      <h4>Companies tracked</h4>
-      <p>{data.companies_tracked.join(", ") || "none yet"}</p>
     </div>
   );
 }
 
-function AskPage() {
+function RegistrySection() {
+  return (
+    <section id="registry" className="page-section">
+      <SectionHeader
+        eyebrow="Versioning"
+        title="Registry"
+        description="Every agent's version history and which version is currently active."
+      />
+      <div className="registry-list">
+        {AGENTS.map((a) => (
+          <RegistryAgentBlock key={a} agent={a} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function SystemHealthSection() {
+  const { loading, error, data } = useAsync(api.getMetrics, []);
+  return (
+    <section id="health" className="page-section">
+      <SectionHeader
+        eyebrow="Observability"
+        title="System Health"
+        description="Read-only rollups over the trend store and incident log."
+      />
+      {error && <ErrorBanner error={error} />}
+      {loading && <p className="muted">Loading…</p>}
+      {data && (
+        <div className="health-grid">
+          <div className="health-card">
+            <h4>Incidents by kind</h4>
+            <pre>{JSON.stringify(data.incident_rates.by_kind, null, 2)}</pre>
+          </div>
+          <div className="health-card">
+            <h4>Incidents by risk tier</h4>
+            <pre>{JSON.stringify(data.incident_rates.by_risk_tier, null, 2)}</pre>
+          </div>
+          <div className="health-card health-card-wide">
+            <h4>Human-approval turnaround</h4>
+            {data.approval_turnaround.length === 0 ? (
+              <p className="muted">No decided approvals yet.</p>
+            ) : (
+              <ul>
+                {data.approval_turnaround.map((a) => (
+                  <li key={a.incident_id}>
+                    {a.incident_id}: {a.status} in {a.business_days_elapsed} business day(s){" "}
+                    {a.within_sla ? "(within SLA)" : "(SLA breached)"}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h4>Companies tracked</h4>
+            <p className="muted">{data.companies_tracked.join(", ") || "none yet"}</p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function AskSection() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -343,12 +420,18 @@ function AskPage() {
   }
 
   return (
-    <div>
-      <p>
-        Ask a question grounded in this run's real data. Requires <code>OPENAI_API_KEY</code>{" "}
-        set on the console API process — the one place this app calls a live third-party LLM,
-        separate from the deterministic core and the six Claude subagents.
-      </p>
+    <section id="ask" className="page-section">
+      <SectionHeader
+        eyebrow="Grounded Q&A"
+        title="Ask"
+        description={
+          <>
+            Requires <code>OPENAI_API_KEY</code> set on the console API process — the one place
+            this app calls a live third-party LLM, separate from the deterministic core and the
+            six Claude subagents.
+          </>
+        }
+      />
       <textarea
         rows={3}
         value={question}
@@ -357,51 +440,45 @@ function AskPage() {
       />
       <div>
         <button disabled={busy || !question.trim()} onClick={submit}>
-          {busy ? "Asking..." : "Ask"}
+          {busy ? "Asking…" : "Ask"}
         </button>
       </div>
       {err && <div className="error-banner">{err}</div>}
       {answer && <div className="ask-answer">{answer}</div>}
-    </div>
+    </section>
   );
 }
 
-export default function App() {
-  const [tab, setTab] = useState("Overview");
-  const [selectedCompany, setSelectedCompany] = useState(null);
+// ---------------------------------------------------------------------------
 
-  function goToCompany(id) {
-    setSelectedCompany(id);
-    setTab("Company");
-  }
+export default function App() {
+  const active = useActiveSection(SECTIONS.map((s) => s.id));
 
   return (
     <div className="app-shell">
-      <header>
+      <header className="app-header">
         <h1>Stack Sentinel</h1>
         <p className="subtitle">Multi-agent AI software monitoring — live operator console</p>
       </header>
-      <nav>
-        {TABS.map((t) => (
-          <button
-            key={t}
-            className={t === tab ? "nav-btn nav-btn-active" : "nav-btn"}
-            onClick={() => setTab(t)}
-          >
-            {t}
-          </button>
+
+      <nav className="section-nav">
+        {SECTIONS.map((s) => (
+          <a key={s.id} href={`#${s.id}`} className={active === s.id ? "nav-link nav-link-active" : "nav-link"}>
+            {s.label}
+          </a>
         ))}
       </nav>
-      <main>
-        {tab === "Overview" && <OverviewPage onSelectCompany={goToCompany} />}
-        {tab === "Company" && (
-          <CompanyPage companyId={selectedCompany} onSelectCompany={setSelectedCompany} />
-        )}
-        {tab === "Incidents" && <IncidentsPage />}
-        {tab === "Registry" && <RegistryPage />}
-        {tab === "System Health" && <SystemHealthPage />}
-        {tab === "Ask" && <AskPage />}
+
+      <main className="page-body">
+        <OverviewSection />
+        <CompaniesSection />
+        <IncidentsSection />
+        <RegistrySection />
+        <SystemHealthSection />
+        <AskSection />
       </main>
+
+      <footer className="app-footer">Stack Sentinel — local-only operator console.</footer>
     </div>
   );
 }
