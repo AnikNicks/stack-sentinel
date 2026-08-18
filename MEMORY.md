@@ -7,9 +7,9 @@ mapping.
 
 ## Working memory
 
-The bounded context assembled for a single agent invocation: the current quarter's
-financials plus the bounded recent window described in each agent's retrieval scope (last
-4-6 quarters for `pe-thesis-tracker`/`pd-covenant-tracker`/`trend-synthesizer`; exactly the
+The bounded context assembled for a single agent invocation: the current cycle's system
+metrics plus the bounded recent window described in each agent's retrieval scope (last 4-6
+cycles for `goal-drift-tracker`/`slo-risk-tracker`/`change-impact-synthesizer`; exactly the
 two entries bracketing a boundary for `model-boundary-interpreter`; the latest entry per
 company for `portfolio-rollup-writer`; no trend data at all for
 `policy-compliance-checker`). Assembled fresh by `pulse/orchestrator.py` for every
@@ -22,31 +22,37 @@ invocation, discarded after — an agent never carries state between invocations
 place. Every entry records exactly which agent version and model produced it
 (`classifying_agent`, `agent_version`, `model`), never re-derived from a live registry lookup
 later — that's what makes `pulse/model_boundary.py`'s reproducibility check possible at all:
-the record of "what produced this" travels with the data.
+the record of "what produced this" travels with the data. `pulse/layer_versioning.py` reads
+this same episodic record to detect layer-level version changes across cycles — a second
+detection path over the identical memory, answering a different question (did the *monitored
+system* change) than `model_boundary.py` (did *our own classifier* change).
 
 ## Semantic memory
 
-The stable facts fetched via `get_investment_thesis(company_id)` (PE) and
-`get_loan_agreement(company_id)` (PD) — the investment thesis or loan agreement set at close.
-Distinct from episodic memory in one crucial way: semantic memory doesn't change quarter to
-quarter (the thesis a deal was underwritten on is fixed at close), while episodic memory is
-exactly the quarter-by-quarter record of how reality tracked against that fixed thesis.
+The stable facts fetched via `get_system_charter(company_id)` (CHARTER-tracked companies) and
+`get_slo_agreement(company_id)` (SLO-tracked companies) — the behavior boundaries or SLO
+thresholds set at launch. Distinct from episodic memory in one crucial way: semantic memory
+doesn't change cycle to cycle (the charter a system launched with is fixed), while episodic
+memory is exactly the cycle-by-cycle record of how the system's real behavior tracked against
+that fixed charter.
 
 ## Procedural memory — explicitly NOT present
 
 There is no learned-pattern store anywhere in this system that any agent writes to or reads
 from. No "the system has learned that X usually means Y" mechanism exists. This is a
-deliberate omission, not a gap: `pulse/risk_scoring.py`'s three deterministic rules
-(systemic-flag-spike, model-boundary ambiguity, policy violation) serve the role a
-procedural-memory system might otherwise fill — **encoded, inspectable rules instead of
-learned, opaque ones.** If asked directly why: a procedural-memory system that quietly
-reweights its own risk thresholds based on outcomes is exactly the kind of drift this whole
-project exists to prevent — an escalation rule that changed itself last quarter for reasons
-nobody wrote down is indistinguishable, eighteen months later, from the model-boundary
-problem this system already has enough trouble catching. Every threshold in
-`risk_scoring.py` (the systemic-spike count, the business-day SLAs in `policy_rules.py`) is a
-plain constant in source code, changed only by a human editing a file and committing it —
-that commit *is* the procedural-memory update, and it's fully auditable.
+deliberate omission, not a gap: `pulse/risk_scoring.py`'s four deterministic rules
+(systemic-flag-spike, model-boundary ambiguity, policy violation, destructive layer change)
+serve the role a procedural-memory system might otherwise fill — **encoded, inspectable rules
+instead of learned, opaque ones.** If asked directly why: a procedural-memory system that
+quietly reweights its own risk thresholds based on outcomes is exactly the kind of drift this
+whole project exists to prevent — an escalation rule that changed itself last cycle for
+reasons nobody wrote down is indistinguishable, eighteen months later, from the model-boundary
+problem this system already has enough trouble catching. Every threshold in `risk_scoring.py`
+(the systemic-spike count, the business-day SLAs in `policy_rules.py`) is a plain constant in
+source code, changed only by a human editing a file and committing it — that commit *is* the
+procedural-memory update, and it's fully auditable. `pulse/benchmarks.py`'s hand-authored case
+suites are the same discipline applied one step earlier: a human-written, versioned check run
+*before* activation, not a self-tuning gate.
 
 ## The concrete "when to ignore memory" case
 
@@ -55,6 +61,6 @@ that commit *is* the procedural-memory update, and it's fully auditable.
 already-computed classification/routing decision. This is the system's clearest example of
 choosing *not* to retrieve available memory: pulling episodic trend data into a policy-
 compliance judgment would add noise, not signal — the question "does this routing satisfy
-policy" doesn't get better answered by knowing the company's revenue three years ago. Every
-other agent's retrieval scope is about *bounding* memory; this one is about *excluding* a
-whole category of it.
+policy" doesn't get better answered by knowing a company's incident history three years ago.
+Every other agent's retrieval scope is about *bounding* memory; this one is about *excluding*
+a whole category of it.

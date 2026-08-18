@@ -26,6 +26,6 @@
   "human_note": "Confirmed pre-approved by data governance; cold-storage migration of raw_events_archive verified complete before the drop. Approved to proceed.",
   "counterfactual": null,
   "escalation_log": [],
-  "created_at": "2026-08-18T07:36:29.729545+00:00",
-  "reviewed_at": "2026-08-18T07:36:29.855852+00:00"
+  "created_at": "2026-08-18T07:39:53.367119+00:00",
+  "reviewed_at": "2026-08-18T07:39:53.476317+00:00"
 }

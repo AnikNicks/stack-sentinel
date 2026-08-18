@@ -16,7 +16,7 @@ T = TypeVar("T")
 
 DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_BASE_DELAY_SECONDS = 0.01  # kept tiny so real backoff still executes without
-                                    # slowing down an 8-quarter simulation to a crawl
+                                    # slowing down a 10-cycle simulation to a crawl
 MAX_MCP_CALLS_PER_COMPANY_PER_CYCLE = 12
 
 
@@ -60,7 +60,7 @@ def call_with_retry(
 
 
 class CallBudget:
-    """Per-company-per-cycle MCP call budget. One instance per company per quarterly cycle."""
+    """Per-company-per-cycle MCP call budget. One instance per company per sprint cycle."""
 
     def __init__(self, max_calls: int = MAX_MCP_CALLS_PER_COMPANY_PER_CYCLE):
         self.max_calls = max_calls

@@ -103,7 +103,7 @@
   "risk_tier": "critical",
   "routing": "auto_rollback",
   "status": "auto_resolved",
-  "remediation_detail": "2 of 3 companies flagged in one quarter (threshold 2) \u2014 real trouble is gradual, not simultaneous; this pattern is the fingerprint of an agent-version regression.",
+  "remediation_detail": "2 of 3 companies flagged in one cycle (threshold 2) \u2014 real trouble is gradual, not simultaneous; this pattern is the fingerprint of an agent-version regression.",
   "resolved_by": "pulse-auto-rollback",
   "human_note": "Auto-rolled back change-impact-synthesizer to v2.",
   "counterfactual": {
@@ -119,6 +119,6 @@
     }
   },
   "escalation_log": [],
-  "created_at": "2026-08-18T07:36:29.614951+00:00",
-  "reviewed_at": "2026-08-18T07:36:29.635453+00:00"
+  "created_at": "2026-08-18T07:39:53.246088+00:00",
+  "reviewed_at": "2026-08-18T07:39:53.269171+00:00"
 }

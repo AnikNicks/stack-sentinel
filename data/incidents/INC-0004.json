@@ -66,7 +66,7 @@
           "rationale": "No layer change_event this cycle plausibly bears on the finding; nothing to attribute."
         }
       ],
-      "recorded_at": "2026-08-18T07:36:29.727968+00:00"
+      "recorded_at": "2026-08-18T07:39:53.351687+00:00"
     },
     "current_entry": {
       "company_id": "wayfinder",
@@ -135,7 +135,7 @@
           "rationale": "Under this cycle's model, the co-occurring mcp-layer tool_version_bump reads as sufficient grounds to treat the ordering discrepancy as a real, attributable finding."
         }
       ],
-      "recorded_at": "2026-08-18T07:36:29.763651+00:00"
+      "recorded_at": "2026-08-18T07:39:53.402786+00:00"
     }
   },
   "output_snapshot": {
@@ -152,6 +152,6 @@
   "human_note": "Reviewed per policy's model-attributable-change clause. Wayfinder's S09 finding reproduces the same benign timestamp-ordering artifact seen at S06, now surfaced under a new model snapshot; confirmed as model-interpretation noise, not a real boundary violation. No escalation taken on this classification alone.",
   "counterfactual": null,
   "escalation_log": [],
-  "created_at": "2026-08-18T07:36:29.776798+00:00",
-  "reviewed_at": "2026-08-18T07:36:29.843625+00:00"
+  "created_at": "2026-08-18T07:39:53.402786+00:00",
+  "reviewed_at": "2026-08-18T07:39:53.467788+00:00"
 }

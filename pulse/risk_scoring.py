@@ -32,9 +32,9 @@ def check_systemic_flag_spike(
     flagged_company_ids: list[str], portfolio_size: int,
     threshold: int = SYSTEMIC_SPIKE_THRESHOLD,
 ) -> RiskFinding | None:
-    """A sharp, portfolio-wide jump in flagged companies in one quarter is the deterministic
+    """A sharp, portfolio-wide jump in flagged companies in one cycle is the deterministic
     fingerprint of an agent-version regression, distinct from real portfolio-wide trouble
-    (which shows up gradually, company by company, quarter over quarter — not all at once).
+    (which shows up gradually, company by company, cycle over cycle — not all at once).
 
     Always routes to automatic rollback: reverting to a previously-live version is safe
     regardless of confidence, since the old version was already in production and known-good.
@@ -46,7 +46,7 @@ def check_systemic_flag_spike(
             routing="auto_rollback",
             justification=(
                 f"{len(flagged_company_ids)} of {portfolio_size} companies flagged in one "
-                f"quarter (threshold {threshold}) — real trouble is gradual, not simultaneous; "
+                f"cycle (threshold {threshold}) — real trouble is gradual, not simultaneous; "
                 "this pattern is the fingerprint of an agent-version regression."
             ),
             detail={"flagged_company_ids": flagged_company_ids, "portfolio_size": portfolio_size},
