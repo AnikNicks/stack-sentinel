@@ -1,17 +1,25 @@
-# Stack Sentinel
+# 🛰️ Stack Sentinel
 
 **A multi-agent AI software monitoring system built around one constraint: monitor real
 software-system mechanics — layer versions, deployment/change events, and discrete
 behavior-boundary incidents — never a smoothed trend line that just relabels a financial KPI.**
 
+[![CI](https://github.com/AnikNicks/stack-sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/AnikNicks/stack-sentinel/actions/workflows/ci.yml)
+[![Deploy Pages](https://github.com/AnikNicks/stack-sentinel/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/AnikNicks/stack-sentinel/actions/workflows/deploy-pages.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 This project started as `portfolio-pulse`, a PE/private-debt financial-monitoring demo built
 around the same deterministic/agentic architecture. This build is a full domain pivot — the
 underlying architecture (deterministic core, seven single-shot classifiers, versioned rollback)
 carries over unchanged; everything the system actually *monitors* was rebuilt from scratch.
-Local-only for now: no live notification delivery, no GitHub Pages republish, no separate git
-repo per company — all deliberately deferred, later, user-approved steps.
+
+**Live demo:** [stack-sentinel.io](https://aniknicks.github.io/stack-sentinel/) — a static,
+read-only preview of the actual operator console (bundled snapshot of one real 10-cycle run;
+the write action and the live-LLM Ask panel are disabled, since a public static page can't run
+the FastAPI backend behind them) · three monitored-company product demos, each replaying its
+own real cycle history: [Meridian Concierge](https://aniknicks.github.io/meridian-labs/) ·
+[Wayfinder Copilot](https://aniknicks.github.io/wayfinder-ai/) ·
+[Cascade Pipeline Agent](https://aniknicks.github.io/cascade-analytics/)
 
 ## What this is
 
@@ -104,7 +112,12 @@ error-budget gauge and the blocked destructive migration:
 
 ## Project architecture
 
-<img src="docs/screenshots/project-architecture.svg" alt="Stack Sentinel architecture: a per-cycle system snapshot flows into an orchestrator, which routes CHARTER companies through goal-drift-tracker and change-impact-synthesizer and SLO companies through deterministic error-budget math and slo-risk-tracker, into a trend store and two distinct deterministic detection paths (layer_versioning.py for the monitored system's own changes, model_boundary.py for Stack Sentinel's own classifier drift), into deterministic risk scoring, which branches to an automatic rollback, model-boundary-interpreter with mandatory human review, or human_approval.py's destructive-change gate that can never auto-execute — all feeding real notifications, with portfolio-rollup-writer as a separate on-demand report and two read-only web UIs consuming the same data" width="720">
+<p align="center"><img src="docs/screenshots/stack-sentinel-architecture.png" alt="Stack Sentinel request-to-resolution flow: a per-cycle data snapshot flows into the zero-LLM deterministic core (layer versioning, model-boundary detection, risk scoring, incidents, human approval, policy rules, PII/injection/loop/canary detection, company registry + rollback), through the orchestrator's single shared _route_finding() incident lifecycle, across the deterministic/agentic boundary into the seven single-shot subagents, through human_approval.py's destructive-action gate that structurally cannot auto-execute, out through pulse/notifications.py — the only module allowed to call real Gmail/Jira/Confluence/Slack — and finally into two read-only UI consumers, the operator console and the company demo apps" width="820"></p>
+
+*Full request-to-resolution flow, one layer at a time — the data source of truth, the
+zero-LLM deterministic core, the orchestrator's shared incident lifecycle, the
+deterministic/agentic boundary, the human-approval gate, real external dispatch, and the two
+read-only UI consumers.*
 
 Seven subagents, each a single-shot classifier with a retrieval scope sized to exactly what its
 judgment needs — not "always retrieve everything":
@@ -175,12 +188,12 @@ Stated honestly — what's enforced by code versus what's prompt-level disciplin
 | Deterministic core | Python 3.12, zero LLM calls (`pulse/*.py`) |
 | MCP server | `mcp` SDK v2.0.0 (`mcp_server/server.py` + `tools_impl.py`), 7 tools, schema-verified |
 | Vector store | chromadb, default local embedding model — no external API key needed |
-| Real external connectors | Docker MCP Toolkit (`gmail-mcp`, `atlassian`, `slack`), driven by a real MCP client in `pulse/notifications.py` — dry-run by default, not exercised live in this build |
-| Live console | FastAPI (`dashboard/api`) + Vite/React (`dashboard/web`) |
+| Real external connectors | Docker MCP Toolkit (`gmail-mcp`, `atlassian`, `slack`), driven by a real MCP client in `pulse/notifications.py` — dry-run by default; `--live` verified end-to-end against real accounts (see [Engineering notes](#engineering-notes-going-live)) |
+| Live console | FastAPI (`dashboard/api`) + Vite/React (`dashboard/web`) — local-only by design (real write action, no auth); a static read-only preview build ships to Pages instead |
 | Optional live Q&A | OpenAI Chat Completions (`gpt-4o-mini`, `temperature=0`), via `dashboard/api`'s `POST /ask` — the one non-Anthropic model call anywhere in this repo |
-| Company demo apps | Vite/React, static builds, no backend — `companies/*` |
-| Tests | pytest + a framework-free fallback (`tests/run_tests.py`) |
-| CI | GitHub Actions (pytest on every push) — not yet wired to a remote for this build |
+| Company demo apps | Vite/React, static builds, no backend — `companies/*`, each its own repo + Pages site |
+| Tests | pytest + a framework-free fallback (`tests/run_tests.py`) — 127 + 57 passing |
+| CI/CD | GitHub Actions — `ci.yml` (pytest + both frontend builds) and `deploy-pages.yml`, both required-green on every push to `main` |
 
 ## Repository structure
 
@@ -191,11 +204,11 @@ mcp_server/               MCP server (server.py) + real tool implementations (to
 registry/<agent>/         versioned prompt bundles (v1.yaml, v2.yaml, ...) + active.yaml
 policy/                   monitoring_escalation_policy.md + chromadb persistence (gitignored)
 data/                     portfolio_companies.json, layer_metrics/, trend_store/, incidents/
-scripts/                  seed_registry.py, simulate_production_run.py, export_company_fixtures.py, ...
-dashboard/                api/ (FastAPI) + web/ (React) — the live operator console
+scripts/                  seed_registry.py, simulate_production_run.py, export_company_fixtures.py, export_dashboard_snapshot.py, ...
+dashboard/                api/ (FastAPI) + web/ (React) — the live operator console, with a static-preview build mode for Pages
 companies/                meridian-labs/, wayfinder-ai/, cascade-analytics/ — 3 product demo apps
 tests/                    pytest suite + framework-free run_tests.py
-docs/screenshots/         README screenshots + the architecture SVG
+docs/screenshots/         README screenshots + the architecture diagram
 CLAUDE.md, MEMORY.md, VERSIONING.md, SECURITY.md   architecture, memory-model, rollback, and security docs
 ```
 
@@ -227,7 +240,43 @@ cd dashboard\web && npm install && npm run dev                    # terminal 2, 
 cd companies\meridian-labs && npm install && npm run dev
 cd companies\wayfinder-ai && npm install && npm run dev
 cd companies\cascade-analytics && npm install && npm run dev
+
+# 7. Static dashboard preview (optional) — what actually ships to Pages: reads a bundled
+#    read-only data snapshot instead of a live backend, decision/Ask calls disabled
+cd dashboard\web
+.venv\Scripts\python ..\..\scripts\export_dashboard_snapshot.py
+npm install
+$env:VITE_STATIC_MODE="true"; npm run build   # PowerShell; VITE_STATIC_MODE=true npm run build on macOS/Linux
 ```
+
+## Engineering notes: going live
+
+Getting `--live` notification delivery and the Pages deploy actually working surfaced two real
+bugs that never showed up in local dry-run testing or CI — both root-caused, fixed, and
+verified against the real live systems, not patched blind:
+
+- **Wrong tool names and parameters against the real Atlassian remote MCP server.**
+  `pulse/notifications.py` called `jira_create_issue` / `confluence_create_page` with
+  `project_key` / `space_key` — names invented against the *shape* of the API, never checked
+  against the real server. The actual Atlassian remote MCP exposes `createJiraIssue` /
+  `createConfluencePage`, requires a `cloudId` that wasn't configured anywhere, and Confluence
+  needs the space's numeric ID, not its human-readable key. Found by actually running `--live`
+  and reading the error, not by inspection. Fixed with a schema-verified tool call, a new
+  `PULSE_ATLASSIAN_CLOUD_ID`, and a cached space-key→ID resolver — verified with a real
+  `--reset --live` run: **34/34 dispatches sent** (15 email, 14 Slack, 1 Jira, 4 Confluence),
+  0 errors.
+- **A redundant, incorrectly base-pathed Pages build.** The original `deploy-pages.yml` also
+  rebuilt the 3 company apps a second time under `stack-sentinel.io/<company>/`, with no
+  `--base` flag — which would have emitted root-relative asset URLs colliding with the new
+  dashboard's own assets at the site root. Each company app already has its own correctly
+  base-pathed standalone Pages site; the redundant nested copy was removed, and the dashboard
+  build gained an explicit `--base=/stack-sentinel/`. Verified live: `curl` confirms the old
+  nested paths now 404 and the dashboard's own assets resolve correctly.
+
+The common thread: both were only catchable by actually running the live path end-to-end
+against the real external systems — no amount of local dry-run testing or green CI would have
+caught either one, because dry-run mode by design never calls the real tool, and CI never
+deploys to Pages and then fetches the result back.
 
 ## Roadmap
 
@@ -239,9 +288,9 @@ cd companies\cascade-analytics && npm install && npm run dev
   decision downstream of it is real.
 - Run against more than 10 cycles and more than 3 companies to see how the causal-attribution
   gate and rollback mechanism hold up at real portfolio scale.
-- `--live` notification delivery, a GitHub remote + Pages republish, and (if actually wanted)
-  a literal separate git repo per company are all explicitly deferred to a later,
-  user-approved step.
+- Hosting `dashboard/api` itself publicly (a fully live, not just preview, console) was
+  considered and declined — it has a real write action and no auth in front of it, so the
+  static read-only preview is the deliberate choice, not a placeholder for a later step.
 
 ## License
 
