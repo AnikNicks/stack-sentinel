@@ -23,6 +23,8 @@ own real cycle history: [Meridian Concierge](https://aniknicks.github.io/meridia
 
 ## What this is
 
+<p align="center"><img src="docs/screenshots/01-overview.jpg" width="760" alt="Stack Sentinel portfolio overview: 3 companies monitored, 1 open incident, 2 auto-resolved, 14 total incidents, with per-company trend sparklines"></p>
+
 Most "AI monitoring" demos prove a model can classify one thing well once. This project asks
 a different question: what does it actually take to monitor a multi-agent AI software system
 in production, without either (a) needing a human to babysit every classification, or (b)
@@ -83,7 +85,7 @@ category of agent failure mode.
   surface, plus a data-driven replay of its real 10-cycle monitoring history. Read-only:
   nothing here ever feeds back into the monitoring pipeline.
 
-## Live demo
+## Product walkthrough
 
 Three companies, one 10-sprint-cycle run (`2025-S01` → `2025-S10`), each carrying a different
 real story:
@@ -96,20 +98,20 @@ real story:
 
 ### Screenshots
 
-Every screenshot below is of the actual live static preview (`stack-sentinel.io`) or the actual
-company demo app — not a mockup, and not the stale early-build UI a README image can quietly
-drift into: these were re-captured this session against the current 4-section console (System /
-Ask / Companies / Incidents) and its real 14-incident dataset.
+Every screenshot below is of the actual live static preview (`stack-sentinel.io`), the actual
+company demo app, or a real inbox — not a mockup, and not the stale early-build UI a README
+image can quietly drift into: the console captures were re-taken this session against the
+current 4-section UI (System / Ask / Companies / Incidents) and its real 14-incident dataset.
 
-| System Overview | Companies Detail |
+| Companies Detail | Incidents Queue |
 |:---:|:---:|
-| <img src="docs/screenshots/01-overview.jpg" width="480" alt="Portfolio snapshot: 3 companies monitored, 1 open incident, 2 auto-resolved, 14 total, with per-company trend sparklines"> | <img src="docs/screenshots/03-company-detail.jpg" width="480" alt="Meridian Labs: charter boundaries, internal agents with real rollback status, and policy clauses"> |
-| *Portfolio-wide snapshot — live incident counts and a 6-cycle trend sparkline per company.* | *One company's full detail: charter boundaries, internal agents (note `intake-triage-agent`'s real `rolled back` status), and policy.* |
+| <img src="docs/screenshots/03-company-detail.jpg" width="480" alt="Meridian Labs: charter boundaries, internal agents with real rollback status, and policy clauses"> | <img src="docs/screenshots/02-incidents.jpg" width="480" alt="All 14 real incidents across every finding kind, risk tier, routing decision, and status"> |
+| *One company's full detail: charter boundaries, internal agents (note `intake-triage-agent`'s real `rolled back` status), and policy.* | *All 14 incidents on record — every finding kind, risk tier, routing decision, and status, in one table.* |
 
-| Incidents Queue | Company Product Demo |
+| Company Product Demo | Live Gmail Dispatch |
 |:---:|:---:|
-| <img src="docs/screenshots/02-incidents.jpg" width="480" alt="All 14 real incidents across every finding kind, risk tier, routing decision, and status"> | <img src="docs/screenshots/04-cascade-product-demo.jpg" width="480" alt="Cascade Pipeline Agent product demo: error-budget gauge and the blocked destructive migration"> |
-| *All 14 incidents on record — every finding kind, risk tier, routing decision, and status, in one table.* | *Cascade's illustrative product demo — the same blocked destructive migration from the story above, dramatized in-product.* |
+| <img src="docs/screenshots/04-cascade-product-demo.jpg" width="480" alt="Cascade Pipeline Agent product demo: error-budget gauge and the blocked destructive migration"> | <img src="docs/screenshots/05-gmail-live-notifications.png" width="480" alt="Real Gmail inbox showing Stack Sentinel's live-dispatched incident and RRB-escalation emails, timestamped and in order"> |
+| *Cascade's illustrative product demo — the same blocked destructive migration from the story above, dramatized in-product.* | *`--live` isn't a claim — this is the real inbox `pulse/notifications.py` dispatched to, one email per incident, in order (see [Engineering notes](#engineering-notes-going-live)).* |
 
 ## Project architecture
 
@@ -265,7 +267,7 @@ verified against the real live systems, not patched blind:
   and reading the error, not by inspection. Fixed with a schema-verified tool call, a new
   `PULSE_ATLASSIAN_CLOUD_ID`, and a cached space-key→ID resolver — verified with a real
   `--reset --live` run: **34/34 dispatches sent** (15 email, 14 Slack, 1 Jira, 4 Confluence),
-  0 errors.
+  0 errors. See the real inbox in [Screenshots](#screenshots) above.
 - **A redundant, incorrectly base-pathed Pages build.** The original `deploy-pages.yml` also
   rebuilt the 3 company apps a second time under `stack-sentinel.io/<company>/`, with no
   `--base` flag — which would have emitted root-relative asset URLs colliding with the new
