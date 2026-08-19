@@ -182,6 +182,18 @@ preview of the live operator console itself, not just a link page.
   `simulate_production_run.py --reset` (without `--live`, so it didn't re-fire real
   notifications a third time), which reproduced the identical 14 incidents, confirming the
   corruption was a testing-session artifact, not a logic bug.
+- **README accuracy pass (same session):** the architecture diagram (`docs/screenshots/
+  stack-sentinel-architecture.png`) had 3 agent-card retrieval-scope mislabels and one
+  module mislabel, found by checking every claim against the real `.claude/agents/*.md` tool
+  declarations and module docstrings — corrected via a regenerated diagram, re-verified
+  clean. Separately, `01-overview.jpg`/`02-incidents.jpg`/`03-company-detail.jpg` turned out
+  to be stale, showing the old 6-tab pre-reorg dashboard with only 4 incidents — re-captured
+  live from the deployed static preview against the current UI and real 14-incident dataset.
+  README restructured: a hero overview screenshot moved to the top of "What this is" (no
+  longer duplicated in the gallery below it), "Live demo" renamed to "Product walkthrough" to
+  stop colliding with the intro's own "Live demo:" links line, and a real Gmail-inbox
+  screenshot of the `--live` dispatch added, cross-linked with the Engineering notes section
+  it verifies.
 
 ## In progress
 
