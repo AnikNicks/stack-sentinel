@@ -21,7 +21,10 @@ SYSTEMIC_SPIKE_THRESHOLD = 2
 @dataclass
 class RiskFinding:
     kind: Literal["systemic_flag_spike", "model_boundary_ambiguity", "policy_violation",
-                   "destructive_layer_change", "company_agent_regression"]
+                   "destructive_layer_change", "company_agent_regression",
+                   "cost_anomaly", "context_pressure", "user_escalation_spike",
+                   "pii_exposure", "prompt_injection_succeeded", "agent_loop_detected",
+                   "canary_divergence", "groundedness_failure"]
     risk_tier: RiskTier
     routing: Routing
     justification: str
@@ -170,6 +173,172 @@ def check_company_agent_regression(
                 f"never auto-executed; routed for an explicit, logged human decision. {detail}"
             ),
             detail={"company_id": company_id, "agent": agent},
+        )
+    return None
+
+
+def _tiered_finding(kind: str, risk_tier: RiskTier, justification: str,
+                     detail: dict[str, Any], routing: Routing = "human_review") -> RiskFinding:
+    return RiskFinding(kind=kind, risk_tier=risk_tier, routing=routing,
+                        justification=justification, detail=detail)
+
+
+# --- Continuous per-cycle metrics — same shape as SLO error-budget math: a threshold or
+# trailing-average comparison, evaluated every cycle, never auto-fixable by this system so
+# routing is always human_review regardless of tier. -------------------------------------
+
+def check_cost_anomaly(cost_usd: float, trailing_avg: float | None) -> RiskFinding | None:
+    """Flags a cycle's LLM/tool-call spend well above its own trailing 6-cycle average. No
+    baseline yet (first few cycles) -> nothing to compare against, no finding."""
+    if trailing_avg is None or trailing_avg <= 0:
+        return None
+    pct_over = (cost_usd - trailing_avg) / trailing_avg * 100
+    if pct_over >= 100:
+        risk_tier: RiskTier = "high"
+    elif pct_over >= 50:
+        risk_tier = "medium"
+    else:
+        return None
+    return _tiered_finding(
+        "cost_anomaly", risk_tier,
+        f"Cycle cost ${cost_usd:.2f} is {pct_over:.0f}% above the trailing average "
+        f"${trailing_avg:.2f} — a spend spike with no corresponding auto-remediation; a human "
+        "should account for why.",
+        {"cost_usd": cost_usd, "trailing_avg": trailing_avg},
+    )
+
+
+def check_context_pressure(utilization_pct: float, truncated: bool) -> RiskFinding | None:
+    """`truncated` is a literal, provider-reported fact (did the context window actually
+    overflow), never inferred from the percentage alone — a truncation always outranks a
+    near-full-but-not-truncated cycle regardless of the exact percentage."""
+    if truncated:
+        return _tiered_finding(
+            "context_pressure", "high",
+            f"Context window actually truncated this cycle at {utilization_pct:.0f}% "
+            "utilization — output may be missing content the agent never saw.",
+            {"utilization_pct": utilization_pct, "truncated": True},
+        )
+    if utilization_pct >= 90:
+        return _tiered_finding(
+            "context_pressure", "medium",
+            f"Context utilization at {utilization_pct:.0f}% — approaching the window limit "
+            "without truncating yet.",
+            {"utilization_pct": utilization_pct, "truncated": False},
+        )
+    return None
+
+
+def check_user_escalation_spike(rate_pct: float, thresholds: dict[str, float]) -> RiskFinding | None:
+    """Same warning/breach shape as classify_slo_status, applied to the fraction of
+    interactions users themselves escalated to a human — a direct signal independent of what
+    the classifiers say about the cycle."""
+    if rate_pct >= thresholds["breach_at_or_above"]:
+        risk_tier: RiskTier = "high"
+    elif rate_pct >= thresholds["warning_at_or_above"]:
+        risk_tier = "medium"
+    else:
+        return None
+    return _tiered_finding(
+        "user_escalation_spike", risk_tier,
+        f"User-escalation rate at {rate_pct:.1f}% (warning>={thresholds['warning_at_or_above']}, "
+        f"breach>={thresholds['breach_at_or_above']}) — users themselves are routing around "
+        "the agent at an elevated rate.",
+        {"rate_pct": rate_pct},
+    )
+
+
+# --- Discrete per-cycle events — each backed by a real deterministic detector in pulse/
+# (pii_scan.py, injection_monitoring.py, agent_loop_detection.py, canary_comparison.py), or by
+# the one new agent (groundedness-checker) for the one case that's a genuine semantic
+# judgment. --------------------------------------------------------------------------------
+
+def check_pii_exposure(matches: list[str]) -> RiskFinding | None:
+    """Any real PII pattern match in a company's own output sample is critical regardless of
+    which pattern matched — the exposure already happened, so this is incident response, not a
+    gate on a future action (unlike destructive_layer_change, there's nothing left to block)."""
+    if not matches:
+        return None
+    return _tiered_finding(
+        "pii_exposure", "critical",
+        f"PII pattern(s) detected in a real output sample: {', '.join(matches)}. Already "
+        "exposed — this is incident response, not a pending action.",
+        {"matches": matches},
+    )
+
+
+def check_prompt_injection(marker_hits: list[str], succeeded: bool) -> RiskFinding | None:
+    """Fires ONLY when the injection attempt actually changed the monitored system's real
+    behavior this cycle (succeeded=True, decided by the caller cross-referencing this cycle's
+    behavior_incidents — never by re-reading the injected text itself). An attempt that did not
+    succeed is still real signal, but is aggregated into pulse/metrics.security_scan_summary
+    rather than becoming its own incident — not every observation needs a full incident
+    lifecycle, the same reasoning behind the RRB clause dispatching directly instead."""
+    if not marker_hits or not succeeded:
+        return None
+    return _tiered_finding(
+        "prompt_injection_succeeded", "critical",
+        f"Injection marker(s) {marker_hits} present this cycle AND a real behavior_incident "
+        "was recorded the same cycle — the attempt changed real behavior, not just phrasing.",
+        {"marker_hits": marker_hits},
+    )
+
+
+def check_agent_loop(repeat_count: int, threshold: int = 5) -> RiskFinding | None:
+    """Mirrors check_company_agent_regression's exact tiering contract: low/medium risk ->
+    auto_rollback (reusing pulse/company_rollback.py — the prior version wasn't looping, so
+    reverting to it is safe by the same reasoning as every other auto-rollback in this system);
+    high/critical -> pending_human_approval, never auto-executed."""
+    if repeat_count < threshold:
+        return None
+    if repeat_count < threshold * 2:
+        risk_tier: RiskTier = "medium"
+        routing: Routing = "auto_rollback"
+    else:
+        risk_tier = "high"
+        routing = "pending_human_approval"
+    return _tiered_finding(
+        "agent_loop_detected", risk_tier,
+        f"{repeat_count} repeated/alternating calls detected in one cycle (threshold {threshold}) "
+        "— a real hand-off loop, not a single legitimate escalation.",
+        {"repeat_count": repeat_count, "threshold": threshold},
+        routing=routing,
+    )
+
+
+def check_canary_divergence(diverged: bool) -> RiskFinding | None:
+    """A candidate version's decision disagreeing with the last known-good version's decision
+    on the identical input is never auto-resolved either way — pending_human_approval, and
+    approving it only records the decision (pulse/human_approval.py's contract); nothing here
+    auto-promotes the candidate."""
+    if not diverged:
+        return None
+    return _tiered_finding(
+        "canary_divergence", "high",
+        "Candidate version's decision diverges from the last known-good version's decision on "
+        "the identical input — held for human review before any promotion.",
+        {"diverged": True},
+        routing="pending_human_approval",
+    )
+
+
+def check_groundedness(judgment: str) -> RiskFinding | None:
+    """The one finding sourced from an LLM judgment (groundedness-checker) rather than a
+    literal fact — routing is still fixed deterministically regardless of the judgment's
+    content, same discipline as check_model_boundary_ambiguity."""
+    if judgment == "fabricated":
+        return _tiered_finding(
+            "groundedness_failure", "critical",
+            "groundedness-checker judged this output fabricated — not supported by, and "
+            "contradicting, the retrieved source.",
+            {"judgment": judgment},
+        )
+    if judgment == "unsupported":
+        return _tiered_finding(
+            "groundedness_failure", "medium",
+            "groundedness-checker judged this output unsupported by the retrieved source — "
+            "not necessarily wrong, but not verifiable from what was retrieved.",
+            {"judgment": judgment},
         )
     return None
 

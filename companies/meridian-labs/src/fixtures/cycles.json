@@ -68,10 +68,15 @@
       "operational_health": {
         "error_rate_pct": 0.4,
         "p95_latency_ms": 780,
-        "uptime_pct": 99.95
+        "uptime_pct": 99.95,
+        "llm_cost_usd": 3.1,
+        "context_utilization_pct": 55,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 2.5
       },
       "behavior_incidents": [],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": []
     },
     "2025-S02": {
       "layers": {
@@ -107,10 +112,15 @@
       "operational_health": {
         "error_rate_pct": 0.5,
         "p95_latency_ms": 810,
-        "uptime_pct": 99.93
+        "uptime_pct": 99.93,
+        "llm_cost_usd": 3.15,
+        "context_utilization_pct": 58,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 2.8
       },
       "behavior_incidents": [],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": []
     },
     "2025-S03": {
       "layers": {
@@ -146,7 +156,11 @@
       "operational_health": {
         "error_rate_pct": 0.4,
         "p95_latency_ms": 790,
-        "uptime_pct": 99.96
+        "uptime_pct": 99.96,
+        "llm_cost_usd": 3.2,
+        "context_utilization_pct": 56,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 2.6
       },
       "behavior_incidents": [],
       "company_agent_events": [
@@ -155,7 +169,8 @@
           "description": "A routine prompt-template deploy to intake-triage-agent (v2) began occasionally mis-tagging low-priority tickets as 'shipping' instead of 'billing', delaying routing by a few minutes with no customer-facing impact.",
           "risk_tier": "low"
         }
-      ]
+      ],
+      "security_quality_events": []
     },
     "2025-S04": {
       "layers": {
@@ -187,10 +202,15 @@
       "operational_health": {
         "error_rate_pct": 0.3,
         "p95_latency_ms": 760,
-        "uptime_pct": 99.97
+        "uptime_pct": 99.97,
+        "llm_cost_usd": 3.1,
+        "context_utilization_pct": 54,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 2.4
       },
       "behavior_incidents": [],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": []
     },
     "2025-S05": {
       "layers": {
@@ -226,10 +246,15 @@
       "operational_health": {
         "error_rate_pct": 0.4,
         "p95_latency_ms": 800,
-        "uptime_pct": 99.94
+        "uptime_pct": 99.94,
+        "llm_cost_usd": 3.25,
+        "context_utilization_pct": 57,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 2.7
       },
       "behavior_incidents": [],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": []
     },
     "2025-S06": {
       "layers": {
@@ -265,7 +290,11 @@
       "operational_health": {
         "error_rate_pct": 0.6,
         "p95_latency_ms": 950,
-        "uptime_pct": 99.9
+        "uptime_pct": 99.9,
+        "llm_cost_usd": 3.3,
+        "context_utilization_pct": 60,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 3.0
       },
       "behavior_incidents": [
         {
@@ -273,7 +302,8 @@
           "boundary_violated": "Refunds over $200 must be routed to human approval before execution."
         }
       ],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": []
     },
     "2025-S07": {
       "layers": {
@@ -309,10 +339,36 @@
       "operational_health": {
         "error_rate_pct": 0.4,
         "p95_latency_ms": 800,
-        "uptime_pct": 99.95
+        "uptime_pct": 99.95,
+        "llm_cost_usd": 3.2,
+        "context_utilization_pct": 58,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 2.9
       },
       "behavior_incidents": [],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": [
+        {
+          "type": "agent_loop",
+          "agents_involved": [
+            "escalation-agent",
+            "resolution-agent"
+          ],
+          "call_sequence": [
+            "escalation-agent",
+            "resolution-agent",
+            "escalation-agent",
+            "resolution-agent",
+            "escalation-agent",
+            "resolution-agent",
+            "escalation-agent",
+            "resolution-agent",
+            "escalation-agent",
+            "resolution-agent"
+          ],
+          "description": "A refund-dispute ticket bounced between escalation-agent and resolution-agent 10 times in one session \u2014 each side re-routing it back to the other rather than resolving or escalating to a human."
+        }
+      ]
     },
     "2025-S08": {
       "layers": {
@@ -344,10 +400,15 @@
       "operational_health": {
         "error_rate_pct": 0.3,
         "p95_latency_ms": 770,
-        "uptime_pct": 99.97
+        "uptime_pct": 99.97,
+        "llm_cost_usd": 3.35,
+        "context_utilization_pct": 62,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 18.5
       },
       "behavior_incidents": [],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": []
     },
     "2025-S09": {
       "layers": {
@@ -383,10 +444,15 @@
       "operational_health": {
         "error_rate_pct": 0.4,
         "p95_latency_ms": 790,
-        "uptime_pct": 99.95
+        "uptime_pct": 99.95,
+        "llm_cost_usd": 3.15,
+        "context_utilization_pct": 59,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 4.0
       },
       "behavior_incidents": [],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": []
     },
     "2025-S10": {
       "layers": {
@@ -418,10 +484,15 @@
       "operational_health": {
         "error_rate_pct": 0.3,
         "p95_latency_ms": 760,
-        "uptime_pct": 99.97
+        "uptime_pct": 99.97,
+        "llm_cost_usd": 3.1,
+        "context_utilization_pct": 56,
+        "context_truncated": false,
+        "user_escalation_rate_pct": 3.0
       },
       "behavior_incidents": [],
-      "company_agent_events": []
+      "company_agent_events": [],
+      "security_quality_events": []
     }
   }
 }

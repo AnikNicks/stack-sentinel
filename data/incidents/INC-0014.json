@@ -1,0 +1,59 @@
+{
+  "incident_id": "INC-0014",
+  "detected_at": "2025-05-06",
+  "kind": "groundedness_failure",
+  "company_ids": [
+    "cascade"
+  ],
+  "agent_version": "v1",
+  "model": "claude-sonnet-4-20250514",
+  "input_snapshot": {
+    "company_id": "cascade",
+    "judgment": "fabricated",
+    "agent": "schema-inference-agent"
+  },
+  "output_snapshot": {},
+  "risk_tier": "critical",
+  "routing": "human_review",
+  "status": "reviewed",
+  "remediation_detail": "groundedness-checker judged this output fabricated \u2014 not supported by, and contradicting, the retrieved source.",
+  "resolved_by": "priya.nair@platform-reliability.example.com",
+  "human_note": "Reviewed \u2014 see the incident's own remediation_detail and policy_check for the full record.",
+  "counterfactual": null,
+  "policy_check": {
+    "cascade": {
+      "matched_clause_titles": [
+        "Schema-match groundedness"
+      ],
+      "company_clauses": [
+        {
+          "title": "Schema-match groundedness",
+          "text": "## Schema-match groundedness\n\nschema-inference-agent's summaries claiming a batch matches a known schema must be checked\nagainst the actual retrieved schema definition. A claimed field or confidence figure the\nretrieved schema doesn't support is a fabricated claim, not a genuine match, and is escalated\nat the highest severity this policy defines.",
+          "distance": 0.9990679621696472
+        }
+      ],
+      "shared_clauses": [
+        {
+          "title": "Groundedness and factual accuracy",
+          "text": "## Groundedness and factual accuracy\n\nA monitored agent's generated claim that is not actually supported by the source material it\ncites is a real-content-quality failure distinct from a behavior-boundary violation. A claim\nthat outright contradicts or invents specifics absent from its source is escalated at the\nhighest severity this policy defines; a claim the source simply does not address is escalated\nat a lower severity. Both route to human review, never to an automated correction of the claim\nitself.",
+          "distance": 0.8123073577880859
+        }
+      ],
+      "contributing_assessments": [
+        {
+          "agent": "slo-risk-tracker",
+          "version": "v1",
+          "model": "claude-sonnet-4-20250514",
+          "trajectory": "improving",
+          "rationale": "Error budget eased to 85% from 95% following the approved cleanup migration."
+        }
+      ],
+      "checked": true,
+      "compliant": true,
+      "rationale": "schema-inference-agent's claimed field and confidence figure are not present in the retrieved schema \u2014 a fabricated claim per Cascade's own policy, correctly escalated at the highest severity."
+    }
+  },
+  "escalation_log": [],
+  "created_at": "2026-08-19T09:07:32.957870+00:00",
+  "reviewed_at": "2026-08-19T09:07:33.480334+00:00"
+}

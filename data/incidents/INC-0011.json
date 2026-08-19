@@ -1,0 +1,64 @@
+{
+  "incident_id": "INC-0011",
+  "detected_at": "2025-04-22",
+  "kind": "destructive_layer_change",
+  "company_ids": [
+    "cascade"
+  ],
+  "agent_version": "v1",
+  "model": "claude-sonnet-4-20250514",
+  "input_snapshot": {
+    "layer": "database",
+    "change_event": {
+      "type": "schema_migration",
+      "description": "Proposed migration: DROP TABLE raw_events_archive (4.2M rows) to reclaim storage ahead of a cold-storage cutover.",
+      "reversible": false
+    },
+    "from_version": "v2",
+    "to_version": "v3"
+  },
+  "output_snapshot": {},
+  "risk_tier": "critical",
+  "routing": "pending_human_approval",
+  "status": "approved",
+  "remediation_detail": "Non-reversible change_event on the 'database' layer \u2014 per policy, any irreversible layer change must be routed to a human for an explicit, logged decision before any downstream action proceeds; it is never auto-executed.",
+  "resolved_by": "morgan.reyes@data-governance.example.com",
+  "human_note": "Confirmed pre-approved by data governance; cold-storage migration of raw_events_archive verified complete before the drop. Approved to proceed.",
+  "counterfactual": null,
+  "policy_check": {
+    "cascade": {
+      "matched_clause_titles": [
+        "Destructive schema changes"
+      ],
+      "company_clauses": [
+        {
+          "title": "Destructive schema changes",
+          "text": "## Destructive schema changes\n\nAny database-layer change flagged non-reversible (a schema drop, an unrecoverable migration)\nmust be routed to `pending_human_approval` and never auto-executed, per the shared policy's\n\"Destructive and irreversible layer changes\" clause. This applies regardless of how routine\nthe migration appears in its own changelog.",
+          "distance": 0.6480447053909302
+        }
+      ],
+      "shared_clauses": [
+        {
+          "title": "Destructive and irreversible layer changes",
+          "text": "## Destructive and irreversible layer changes\n\nAny layer-level change assessed as non-reversible (data-loss potential, a schema drop without\na verified rollback path, credential rotation without a fallback, etc.) must never be\nauto-remediated. It must be routed to `pending_human_approval` and require an explicit,\nlogged decision from a designated human reviewer before any downstream action proceeds. This\napplies regardless of which layer the change touches \u2014 repository/CI-CD, database, memory,\ntools, MCP integrations, or the production application \u2014 and regardless of how routine or\nlow-risk the change appears to the system proposing it. No automated actor, including the\nmonitoring system itself, may execute a change flagged this way; the absence of an approval\ndecision is never treated as authorization.",
+          "distance": 0.5312094688415527
+        }
+      ],
+      "contributing_assessments": [
+        {
+          "agent": "slo-risk-tracker",
+          "version": "v1",
+          "model": "claude-sonnet-4-20250514",
+          "trajectory": "stable",
+          "rationale": "Error budget at 95%, still warning-level. A proposed non-reversible database schema migration (dropping raw_events_archive) landed this cycle and is pending human approval \u2014 not executed."
+        }
+      ],
+      "checked": true,
+      "compliant": true,
+      "rationale": "Dropping raw_events_archive is exactly the non-reversible database-layer change Cascade's own policy names. Routing to pending_human_approval rather than executing it is correct, regardless of how routine the migration's own changelog reads."
+    }
+  },
+  "escalation_log": [],
+  "created_at": "2026-08-19T09:07:31.818097+00:00",
+  "reviewed_at": "2026-08-19T09:07:33.393451+00:00"
+}

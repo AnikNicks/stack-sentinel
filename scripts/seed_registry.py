@@ -146,6 +146,21 @@ BUNDLES: dict[str, list[dict]] = {
                                     "monitoring & escalation policy corpus.",
         },
     ],
+    "groundedness-checker": [
+        {
+            "version": "v1",
+            "agent": "groundedness-checker",
+            "created": "2025-01-06",
+            "changelog": "Initial release: judges whether a company agent's generated output "
+                         "is grounded in, unsupported by, or fabricated against its retrieved "
+                         "source excerpt.",
+            "prompt_file": ".claude/agents/groundedness-checker.md",
+            "tool_scope": [],
+            "model": PINNED_MODEL,
+            "objective_statement": "Judge whether a generated output's claim is actually "
+                                    "supported by the specific source excerpt it cites.",
+        },
+    ],
 }
 
 
@@ -198,6 +213,11 @@ def _stand_in_classify_fn(agent: str, version: str):
         return lambda ctx: {
             "compliant": ctx["routing_decision"] == "pending_human_approval",
             "matched_clause_titles": ctx["retrieved_clauses"],
+            "rationale": "stand-in",
+        }
+    if agent == "groundedness-checker":
+        return lambda ctx: {
+            "judgment": "grounded" if ctx["matches_source"] else "fabricated",
             "rationale": "stand-in",
         }
     return lambda ctx: {}

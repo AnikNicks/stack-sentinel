@@ -3,7 +3,7 @@ from pulse import benchmarks
 
 def test_registered_suites_exist_for_classifying_agents():
     for agent in ("goal-drift-tracker", "slo-risk-tracker", "change-impact-synthesizer",
-                  "model-boundary-interpreter", "policy-compliance-checker"):
+                  "model-boundary-interpreter", "policy-compliance-checker", "groundedness-checker"):
         assert benchmarks.BENCHMARK_SUITES.get(agent), f"no benchmark cases registered for {agent}"
 
 

@@ -26,4 +26,14 @@ loop — the same reasoning as an auto-rollback of Stack Sentinel's own classifi
 version was already live and known-good. Any Meridian-internal agent flagged high or critical
 risk must never be rolled back automatically; an explicit, logged human decision is required
 first. A misrouted support ticket is a low-risk event; anything touching the refund-approval
-or shipping-address boundaries directly is never low-risk, regardless of dollar amount.
+or shipping-address boundaries directly is never low-risk, regardless of dollar amount. This
+applies equally to a detected hand-off loop between two Meridian agents (e.g.
+escalation-agent and resolution-agent repeatedly bouncing the same ticket): the same
+risk-tiered auto-rollback-or-human-decision split governs it.
+
+## User-escalation rate
+
+A sustained rise in the rate of tickets Meridian's own customers escalate directly to a human
+agent — bypassing the concierge flow rather than any single flagged incident — is itself a
+signal worth human review, independent of whatever the charter-boundary classification says
+that cycle.

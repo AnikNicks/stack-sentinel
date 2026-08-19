@@ -1,7 +1,7 @@
 agent: change-impact-synthesizer
 active_version: v2
 activated_by: pulse-auto-rollback
-activated_at: '2026-08-18T15:14:36.622569+00:00'
+activated_at: '2026-08-19T09:07:29.813020+00:00'
 reason: "2 of 3 companies flagged in one cycle (threshold 2) \u2014 real trouble is\
   \ gradual, not simultaneous; this pattern is the fingerprint of an agent-version\
   \ regression."

@@ -202,3 +202,24 @@ register_case("policy-compliance-checker", BenchmarkCase(
     expected_field="compliant",
     expected_value=False,
 ))
+
+register_case("groundedness-checker", BenchmarkCase(
+    name="claim_directly_supported_by_source_is_grounded",
+    input_context={
+        "output_excerpt": "This batch's schema matches the 'orders_v2' schema on file.",
+        "source_excerpt": "orders_v2 schema: order_id (int), customer_id (int), total_cents (int).",
+        "matches_source": True,
+    },
+    expected_field="judgment",
+    expected_value="grounded",
+))
+register_case("groundedness-checker", BenchmarkCase(
+    name="claim_inventing_a_field_the_source_never_mentions_is_fabricated",
+    input_context={
+        "output_excerpt": "This batch's schema matches 'orders_v2' with 100% confidence, including the new loyalty_tier field.",
+        "source_excerpt": "orders_v2 schema: order_id (int), customer_id (int), total_cents (int).",
+        "matches_source": False,
+    },
+    expected_field="judgment",
+    expected_value="fabricated",
+))

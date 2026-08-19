@@ -1,26 +1,65 @@
 {
   "incident_id": "INC-0003",
-  "detected_at": "2025-03-11",
-  "kind": "company_agent_regression",
+  "detected_at": "2025-02-25",
+  "kind": "context_pressure",
   "company_ids": [
-    "cascade"
+    "wayfinder"
   ],
-  "agent_version": "v1",
+  "agent_version": "v2",
   "model": "claude-sonnet-4-20250514",
   "input_snapshot": {
-    "company_id": "cascade",
-    "agent": "auto-remediation-agent",
-    "risk_tier": "high"
+    "company_id": "wayfinder",
+    "utilization_pct": 93,
+    "truncated": false
   },
   "output_snapshot": {},
-  "risk_tier": "high",
-  "routing": "pending_human_approval",
-  "status": "approved",
-  "remediation_detail": "auto-remediation-agent (cascade) flagged high-risk \u2014 a rollback this severe is never auto-executed; routed for an explicit, logged human decision. auto-remediation-agent (v2) began auto-truncating malformed ingestion batches instead of quarantining them for review, a wider auto-remediation scope than it was authorized to exercise without a logged human sign-off.",
-  "resolved_by": "dana.kwon@platform-reliability.example.com",
-  "human_note": "Confirmed: auto-remediation-agent v2's widened batch-truncation behavior is not acceptable without a review step. Approved rollback to v1.",
+  "risk_tier": "medium",
+  "routing": "human_review",
+  "status": "reviewed",
+  "remediation_detail": "Context utilization at 93% \u2014 approaching the window limit without truncating yet.",
+  "resolved_by": "priya.nair@platform-reliability.example.com",
+  "human_note": "Reviewed \u2014 see the incident's own remediation_detail and policy_check for the full record.",
   "counterfactual": null,
+  "policy_check": {
+    "wayfinder": {
+      "matched_clause_titles": [
+        "Context-window pressure"
+      ],
+      "company_clauses": [
+        {
+          "title": "Non-refundable booking confirmation boundary",
+          "text": "## Non-refundable booking confirmation boundary\n\nThe agent must never confirm a non-refundable booking without an explicit customer\nconfirmation step logged in the same session. \"Logged in the same session\" is load-bearing:\na confirmation captured in a prior session, or inferred from later behavior, does not satisfy\nthis clause. A `drifted` classification tied to this boundary always receives engineering\nreview within 5 business days per the shared policy's charter-tracking review clause.",
+          "distance": 1.2494213581085205
+        }
+      ],
+      "shared_clauses": [
+        {
+          "title": "Context-window pressure",
+          "text": "## Context-window pressure\n\nA monitored agent whose context window actually overflowed and truncated content this cycle\nmust be treated as at least as serious as one merely approaching the limit, regardless of the\nexact utilization percentage \u2014 truncated content is content the agent never saw, which can\nproduce a confidently wrong answer with no other symptom. Both cases route to human review;\nneither is something this system auto-corrects.",
+          "distance": 0.7104654908180237
+        }
+      ],
+      "contributing_assessments": [
+        {
+          "agent": "goal-drift-tracker",
+          "version": "v1",
+          "raw_classification": "on_charter",
+          "rationale": "No behavior_incidents this cycle; system operating within its charter boundaries."
+        },
+        {
+          "agent": "change-impact-synthesizer",
+          "version": "v2",
+          "model": "claude-sonnet-4-20250514",
+          "read": "noise",
+          "rationale": "No layer change_event this cycle plausibly bears on the finding; nothing to attribute."
+        }
+      ],
+      "checked": true,
+      "compliant": true,
+      "rationale": "Utilization approaching the window limit without an actual truncation this cycle \u2014 correctly routed to human review at the lower of the two tiers the clause describes."
+    }
+  },
   "escalation_log": [],
-  "created_at": "2026-08-18T15:14:36.562607+00:00",
-  "reviewed_at": "2026-08-18T15:14:36.851823+00:00"
+  "created_at": "2026-08-19T09:07:27.735992+00:00",
+  "reviewed_at": "2026-08-19T09:07:33.439597+00:00"
 }

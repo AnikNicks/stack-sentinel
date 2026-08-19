@@ -18,6 +18,13 @@ A booking-provider outage or degraded response is an operational-health matter
 (`error_rate_pct`, `p95_latency_ms`), not a charter-boundary matter, and must not be
 conflated with a real confirmation-boundary violation when investigating a flagged cycle.
 
+## Payment and traveler data exposure
+
+Wayfinder's booking flow routinely handles payment-card and traveler contact details.
+booking-agent output confirmed to contain real payment-card or contact-detail patterns is
+treated as a data-exposure incident requiring immediate human review — booking confirmations
+must reference a payment method without repeating its full number.
+
 ## Internal agent regression handling
 
 Any Wayfinder-internal agent (trip-planner-agent, booking-agent) flagged low or medium risk is

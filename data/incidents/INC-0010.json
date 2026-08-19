@@ -1,0 +1,70 @@
+{
+  "incident_id": "INC-0010",
+  "detected_at": "2025-04-08",
+  "kind": "agent_loop_detected",
+  "company_ids": [
+    "meridian"
+  ],
+  "agent_version": "v2",
+  "model": "claude-sonnet-4-20250514",
+  "input_snapshot": {
+    "company_id": "meridian",
+    "repeat_count": 10,
+    "threshold": 5,
+    "agents_involved": [
+      "escalation-agent",
+      "resolution-agent"
+    ]
+  },
+  "output_snapshot": {},
+  "risk_tier": "high",
+  "routing": "pending_human_approval",
+  "status": "approved",
+  "remediation_detail": "10 repeated/alternating calls detected in one cycle (threshold 5) \u2014 a real hand-off loop, not a single legitimate escalation.",
+  "resolved_by": "priya.nair@platform-reliability.example.com",
+  "human_note": "Confirmed real hand-off loop, not a legitimate multi-step escalation. Approved manual rollback of escalation-agent outside this system's own authority.",
+  "counterfactual": null,
+  "policy_check": {
+    "meridian": {
+      "matched_clause_titles": [
+        "Agent hand-off loops",
+        "Internal agent regression handling"
+      ],
+      "company_clauses": [
+        {
+          "title": "Internal agent regression handling",
+          "text": "## Internal agent regression handling\n\nAny Meridian-internal agent (intake-triage-agent, resolution-agent, escalation-agent) flagged\nlow or medium risk is auto-rolled-back to its last known-good version with no human in the\nloop \u2014 the same reasoning as an auto-rollback of Stack Sentinel's own classifiers: the prior\nversion was already live and known-good. Any Meridian-internal agent flagged high or critical\nrisk must never be rolled back automatically; an explicit, logged human decision is required\nfirst. A misrouted support ticket is a low-risk event; anything touching the refund-approval\nor shipping-address boundaries directly is never low-risk, regardless of dollar amount. This\napplies equally to a detected hand-off loop between two Meridian agents (e.g.\nescalation-agent and resolution-agent repeatedly bouncing the same ticket): the same\nrisk-tiered auto-rollback-or-human-decision split governs it.",
+          "distance": 0.9393930435180664
+        }
+      ],
+      "shared_clauses": [
+        {
+          "title": "Agent hand-off loops",
+          "text": "## Agent hand-off loops\n\nA monitored agent stuck repeatedly handing a task back and forth with another agent, well\nbeyond what a single legitimate escalation would require, is treated with the same\nrisk-tiered discipline as any other internal-agent regression: a bounded loop is reverted\nautomatically to the agent's last known-good version, the same reasoning as any other\nlow/medium-risk auto-rollback (the prior version was not looping); a loop severe enough to\ncross into high or critical risk is never auto-executed and is held for an explicit human\ndecision instead.",
+          "distance": 0.7356867790222168
+        }
+      ],
+      "contributing_assessments": [
+        {
+          "agent": "goal-drift-tracker",
+          "version": "v1",
+          "raw_classification": "on_charter",
+          "rationale": "No behavior_incidents this cycle; system operating within its charter boundaries."
+        },
+        {
+          "agent": "change-impact-synthesizer",
+          "version": "v2",
+          "model": "claude-sonnet-4-20250514",
+          "read": "noise",
+          "rationale": "No layer change_event this cycle plausibly bears on the finding; nothing to attribute."
+        }
+      ],
+      "checked": true,
+      "compliant": true,
+      "rationale": "10 repeated hand-offs between escalation-agent and resolution-agent crosses into the high-risk tier Meridian's own policy names for loop severity \u2014 pending_human_approval, never auto-rolled-back, is correct at this severity."
+    }
+  },
+  "escalation_log": [],
+  "created_at": "2026-08-19T09:07:31.410459+00:00",
+  "reviewed_at": "2026-08-19T09:07:33.431572+00:00"
+}

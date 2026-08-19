@@ -237,6 +237,119 @@ WAYFINDER_S06_V2_COUNTERFACTUAL = {
     "counterfactual_final_classification": "on_charter",
 }
 
+def _pcc(compliant: bool, clauses: list[str], rationale: str) -> dict:
+    return {"compliant": compliant, "matched_clause_titles": clauses, "rationale": rationale}
+
+
+# policy-compliance-checker's scripted judgment for every incident that actually fires below,
+# keyed by (company_id, incident_kind) — orchestrator.run_portfolio_cycle now calls the real
+# search_company_policy + search_policy tools (real chromadb, real per-company collections)
+# and real schema validation for every one of these; only the judgment text itself is
+# scripted, same convention as goal_drift/change_impact/slo_trajectory above. Every rationale
+# below cites a real clause title that actually exists in policy/companies/*.md or
+# policy/monitoring_escalation_policy.md — see those files for the clause text.
+POLICY_COMPLIANCE_OUTPUTS = {
+    ("meridian", "company_agent_regression"): _pcc(
+        True, ["Internal agent regression handling"],
+        "intake-triage-agent's mis-tagging is a misrouted-ticket event — explicitly named "
+        "low-risk by Meridian's own policy, which never touches the refund-approval or "
+        "shipping-address boundaries. Auto-rollback with no human gate is exactly what the "
+        "clause requires for a low-risk internal-agent event.",
+    ),
+    ("cascade", "company_agent_regression"): _pcc(
+        True, ["Auto-remediation scope boundary", "Internal agent regression handling"],
+        "auto-remediation-agent's batch-truncation change is exactly the scope-boundary "
+        "violation Cascade's own policy names as high-risk by definition, regardless of how "
+        "it reduces manual review load. Routing to pending_human_approval instead of "
+        "auto-rolling-back is correct.",
+    ),
+    ("meridian", "systemic_flag_spike"): _pcc(
+        True, ["Systemic anomalies"],
+        "Two companies flagged from the same versioned agent in one cycle is the shared "
+        "policy's textbook systemic-anomaly fingerprint, not simultaneous unrelated "
+        "deterioration. Automatic reversion to the last known-good configuration is the "
+        "required response.",
+    ),
+    ("wayfinder", "systemic_flag_spike"): _pcc(
+        True, ["Systemic anomalies"],
+        "Same systemic-anomaly fingerprint as Meridian's this cycle — the auto-rollback "
+        "applies portfolio-wide, independent of Wayfinder's own specific facts.",
+    ),
+    ("cascade", "destructive_layer_change"): _pcc(
+        True, ["Destructive schema changes"],
+        "Dropping raw_events_archive is exactly the non-reversible database-layer change "
+        "Cascade's own policy names. Routing to pending_human_approval rather than executing "
+        "it is correct, regardless of how routine the migration's own changelog reads.",
+    ),
+    ("wayfinder", "model_boundary_ambiguity"): _pcc(
+        True, ["Model and version boundary handling"],
+        "The classification shift coincides with a pinned-model change, not a deliberate "
+        "version upgrade — per the shared policy this cannot be the sole basis for an "
+        "escalation without human confirmation, which is exactly the human_review routing "
+        "applied here.",
+    ),
+    # --- Phase 7: extended monitoring dimensions -----------------------------------
+    ("cascade", "cost_anomaly"): _pcc(
+        True, ["Cost and resource anomalies"],
+        "Cycle spend well above trailing average, routed to human review with the comparison "
+        "attached rather than silently absorbed — exactly what the clause requires.",
+    ),
+    ("wayfinder", "context_pressure"): _pcc(
+        True, ["Context-window pressure"],
+        "Utilization approaching the window limit without an actual truncation this cycle — "
+        "correctly routed to human review at the lower of the two tiers the clause describes.",
+    ),
+    ("meridian", "user_escalation_spike"): _pcc(
+        True, ["User-escalation rate"],
+        "A sustained rise in tickets escalated directly to a human is exactly the independent "
+        "signal Meridian's own policy names, regardless of the charter classification that "
+        "cycle.",
+    ),
+    ("meridian", "agent_loop_detected"): _pcc(
+        True, ["Agent hand-off loops", "Internal agent regression handling"],
+        "10 repeated hand-offs between escalation-agent and resolution-agent crosses into the "
+        "high-risk tier Meridian's own policy names for loop severity — pending_human_approval, "
+        "never auto-rolled-back, is correct at this severity.",
+    ),
+    ("wayfinder", "pii_exposure"): _pcc(
+        True, ["Payment and traveler data exposure", "PII and data exposure"],
+        "A full card-like number in a booking confirmation is exactly the exposure Wayfinder's "
+        "own policy names; immediate human review, not a pending action, is correct since the "
+        "exposure already occurred.",
+    ),
+    ("cascade", "canary_divergence"): _pcc(
+        True, ["Schema-change canary comparisons"],
+        "The candidate version would auto-approve a change the active version would have "
+        "quarantined — exactly the divergence Cascade's own policy requires holding for human "
+        "review before any promotion.",
+    ),
+    ("cascade", "prompt_injection_succeeded"): _pcc(
+        True, ["Ingestion-payload injection attempts", "Prompt-injection response"],
+        "The injection marker coincided with a real ingestion decision going the wrong way "
+        "this cycle — a successful compromise per Cascade's own policy, correctly escalated at "
+        "the highest severity rather than logged as a mere attempt.",
+    ),
+    ("cascade", "groundedness_failure"): _pcc(
+        True, ["Schema-match groundedness"],
+        "schema-inference-agent's claimed field and confidence figure are not present in the "
+        "retrieved schema — a fabricated claim per Cascade's own policy, correctly escalated at "
+        "the highest severity.",
+    ),
+}
+
+# groundedness-checker's scripted judgment for every groundedness_check event, keyed by
+# (company_id, cycle, event_index within that cycle's security_quality_events list) — same
+# shape as POLICY_COMPLIANCE_OUTPUTS.
+GROUNDEDNESS_OUTPUTS = {
+    ("cascade", "2025-S09", 0): {
+        "judgment": "fabricated",
+        "rationale": "The retrieved orders_v2 schema lists only order_id, customer_id, and "
+                     "total_cents — it defines no loyalty_tier field and states no confidence "
+                     "figure. The output's claim of a 100%-confidence match including "
+                     "loyalty_tier invents specifics the source does not contain.",
+    },
+}
+
 CASCADE_SCRIPT = {
     "2025-S01": {"trajectory": "stable", "rationale": "First reporting cycle; error budget at 62%, comfortably under the 80% warning threshold."},
     "2025-S02": {"trajectory": "deteriorating", "rationale": "Error budget climbed to 68% from 62%."},
@@ -267,9 +380,10 @@ def main() -> None:
 
     run_fault_injection_drills()
 
-    log("=== Activating v1 for all 6 Stack Sentinel agents (2025-S01 baseline) ===")
+    log("=== Activating v1 for all 7 Stack Sentinel agents (2025-S01 baseline) ===")
     for agent in ["goal-drift-tracker", "slo-risk-tracker", "change-impact-synthesizer",
-                  "model-boundary-interpreter", "portfolio-rollup-writer", "policy-compliance-checker"]:
+                  "model-boundary-interpreter", "portfolio-rollup-writer", "policy-compliance-checker",
+                  "groundedness-checker"]:
         pointer = registry.activate(agent, "v1", activated_by="initial-deployment", reason="Initial production deployment.")
         log(f"  {agent} -> {pointer['active_version']} (by {pointer['activated_by']})")
     log()
@@ -288,6 +402,9 @@ def main() -> None:
     rrb_dispatch_cycle = None
     company_agent_auto_rollback_incident_id = None
     company_agent_pending_approval_incident_id = None
+    canary_divergence_incident_id = None
+    agent_loop_pending_approval_incident_id = None
+    extended_monitoring_review_incident_ids: list[str] = []
 
     for cycle in CYCLES:
         log(f"########## {cycle} ##########")
@@ -321,7 +438,7 @@ def main() -> None:
         mer_result = orchestrator.run_charter_company_cycle(
             company_id="meridian", cycle=cycle,
             goal_drift_output=mer_script["goal_drift"], change_impact_output=mer_script["change_impact"],
-            budget=budget_mer,
+            budget=budget_mer, groundedness_outputs=GROUNDEDNESS_OUTPUTS,
         )
         log(f"[meridian]  {mer_result['entry']['classification']:16s} | {mer_result['entry']['rationale'][:110]}")
 
@@ -342,7 +459,7 @@ def main() -> None:
         way_result = orchestrator.run_charter_company_cycle(
             company_id="wayfinder", cycle=cycle,
             goal_drift_output=way_script["goal_drift"], change_impact_output=way_script["change_impact"],
-            budget=budget_way, model_override=way_model_override,
+            budget=budget_way, model_override=way_model_override, groundedness_outputs=GROUNDEDNESS_OUTPUTS,
         )
         log(f"[wayfinder] {way_result['entry']['classification']:16s} | {way_result['entry']['rationale'][:110]}")
 
@@ -350,6 +467,7 @@ def main() -> None:
         cas_result = orchestrator.run_slo_company_cycle(
             company_id="cascade", cycle=cycle, metric_field="monthly_error_budget_consumed_pct",
             thresholds=CASCADE_THRESHOLDS, slo_trajectory_output=cas_script, budget=budget_cas,
+            groundedness_outputs=GROUNDEDNESS_OUTPUTS,
         )
         log(f"[cascade]   {cas_result['entry']['classification']:16s} | {cas_result['entry']['rationale'][:110]}")
 
@@ -378,6 +496,7 @@ def main() -> None:
             cycle=cycle, as_of_date=as_of, portfolio_size=PORTFOLIO_SIZE,
             company_cycle_results=company_results, model_boundary_judgments=model_boundary_judgments,
             systemic_spike_counterfactuals=systemic_spike_counterfactuals,
+            policy_compliance_outputs=POLICY_COMPLIANCE_OUTPUTS,
         )
 
         if cycle_result["flagged_company_ids"]:
@@ -385,6 +504,14 @@ def main() -> None:
         for incident in cycle_result["incidents"]:
             log(f"[incident] {incident['incident_id']} kind={incident['kind']} risk_tier={incident['risk_tier']} "
                 f"routing={incident['routing']} status={incident['status']}")
+            if incident.get("policy_check"):
+                for cid, check in incident["policy_check"].items():
+                    log(f"  [policy check] {cid}: checked={check['checked']} compliant={check['compliant']} "
+                        f"clauses={check['matched_clause_titles']}")
+            if incident["kind"] == "policy_violation":
+                log(f"  [policy violation] non-compliant routing on incident "
+                    f"{incident['input_snapshot']['source_incident_id']} — routed to human_review, "
+                    f"never auto-corrected.")
             if incident["kind"] == "systemic_flag_spike":
                 rollback_incident_id = incident["incident_id"]
                 active_after = registry.get_active("change-impact-synthesizer")
@@ -408,6 +535,33 @@ def main() -> None:
                     company_agent_pending_approval_incident_id = incident["incident_id"]
                     log(f"[human_approval] {incident['incident_id']}: {cid}/{agent} action_taken=False, "
                         f"status=pending_human_approval — NOT rolled back until a human explicitly decides.")
+            if incident["kind"] in ("cost_anomaly", "context_pressure", "user_escalation_spike"):
+                extended_monitoring_review_incident_ids.append(incident["incident_id"])
+            if incident["kind"] == "pii_exposure":
+                extended_monitoring_review_incident_ids.append(incident["incident_id"])
+                log(f"[security] {incident['incident_id']}: real PII pattern(s) detected in a "
+                    f"company output sample — incident response, not a pending action.")
+            if incident["kind"] == "prompt_injection_succeeded":
+                extended_monitoring_review_incident_ids.append(incident["incident_id"])
+                log(f"[security] {incident['incident_id']}: injection marker co-occurred with a "
+                    f"real behavior_incident this cycle — treated as a successful compromise.")
+            if incident["kind"] == "agent_loop_detected":
+                if incident["routing"] == "auto_rollback":
+                    cid = incident["company_ids"][0]
+                    agent = incident["input_snapshot"]["agents_involved"][0]
+                    active_after = company_registry.get_active(cid, agent)
+                    log(f"[company rollback] {cid}/{agent} active version after loop auto-rollback: "
+                        f"{active_after['version']} (activated_by={active_after['activated_by']})")
+                else:
+                    agent_loop_pending_approval_incident_id = incident["incident_id"]
+                    log(f"[human_approval] {incident['incident_id']}: agent-loop severity crossed into "
+                        f"the high tier — action_taken=False, status=pending_human_approval.")
+            if incident["kind"] == "canary_divergence":
+                canary_divergence_incident_id = incident["incident_id"]
+                log(f"[human_approval] {incident['incident_id']}: candidate version's decision "
+                    f"diverges from the active version's — held for review, never auto-promoted.")
+            if incident["kind"] == "groundedness_failure":
+                extended_monitoring_review_incident_ids.append(incident["incident_id"])
 
         # RRB escalation check for Cascade (deterministic policy_rules).
         cas_history = tools_impl.get_trend_history("cascade", limit=None,
@@ -471,6 +625,42 @@ def main() -> None:
             f"{rollback_pointer['active_version']} (activated_by={rollback_pointer['activated_by']}) "
             f"— executed only after, and because of, the explicit human approval above.")
 
+    # Scripted human decision on the canary-divergence incident — rejecting the candidate
+    # version means it simply never gets activated (it was never live to begin with, unlike a
+    # company-agent rollback), matching human_approval.py's never-acts-itself contract.
+    if canary_divergence_incident_id:
+        rejected = incidents.record_approval_decision(
+            canary_divergence_incident_id, "rejected", decided_by="priya.nair@platform-reliability.example.com",
+            note=(
+                "schema-inference-agent v2-candidate would auto-approve a change v1 correctly "
+                "quarantines. Rejected — candidate stays unregistered for activation pending a "
+                "fix to its scope boundary."
+            ),
+        )
+        log(f"[human decision] {canary_divergence_incident_id} -> status={rejected['status']}, "
+            f"resolved_by={rejected['resolved_by']} — candidate never promoted.")
+
+    # Scripted human decision on the agent-loop incident that crossed into the high-risk tier
+    # (never auto-rolled-back at that severity).
+    if agent_loop_pending_approval_incident_id:
+        approved = incidents.record_approval_decision(
+            agent_loop_pending_approval_incident_id, "approved", decided_by="priya.nair@platform-reliability.example.com",
+            note="Confirmed real hand-off loop, not a legitimate multi-step escalation. Approved "
+                 "manual rollback of escalation-agent outside this system's own authority.",
+        )
+        log(f"[human decision] {agent_loop_pending_approval_incident_id} -> status={approved['status']}, "
+            f"resolved_by={approved['resolved_by']}")
+
+    # Scripted human review closing out every human_review-routed extended-monitoring
+    # incident (cost/context/escalation/PII/injection/groundedness) — confirms each was seen
+    # by a human, never silently left open past this run.
+    for incident_id in extended_monitoring_review_incident_ids:
+        reviewed = incidents.record_human_review(
+            incident_id, resolved_by="priya.nair@platform-reliability.example.com",
+            human_note="Reviewed — see the incident's own remediation_detail and policy_check for the full record.",
+        )
+        log(f"[human review] {incident_id} -> status={reviewed['status']}, resolved_by={reviewed['resolved_by']}")
+
     scenario_facts.update({
         "rollback_incident_id": rollback_incident_id,
         "boundary_incident_id": boundary_incident_id,
@@ -478,6 +668,9 @@ def main() -> None:
         "rrb_dispatch_cycle": rrb_dispatch_cycle,
         "company_agent_auto_rollback_incident_id": company_agent_auto_rollback_incident_id,
         "company_agent_pending_approval_incident_id": company_agent_pending_approval_incident_id,
+        "canary_divergence_incident_id": canary_divergence_incident_id,
+        "agent_loop_pending_approval_incident_id": agent_loop_pending_approval_incident_id,
+        "extended_monitoring_review_incident_ids": extended_monitoring_review_incident_ids,
         "live_mode": notifications.is_live(),
     })
     facts_path = PROJECT_ROOT / "data" / "scenario_facts.json"
@@ -486,7 +679,10 @@ def main() -> None:
     log(f"Rollback incident: {rollback_incident_id} | Model-boundary incident: {boundary_incident_id} | "
         f"Destructive-change incident: {destructive_incident_id} | RRB dispatch cycle: {rrb_dispatch_cycle} | "
         f"Company-agent auto-rollback: {company_agent_auto_rollback_incident_id} | "
-        f"Company-agent pending-approval: {company_agent_pending_approval_incident_id}")
+        f"Company-agent pending-approval: {company_agent_pending_approval_incident_id} | "
+        f"Canary-divergence: {canary_divergence_incident_id} | "
+        f"Agent-loop pending-approval: {agent_loop_pending_approval_incident_id} | "
+        f"Extended-monitoring incidents reviewed: {len(extended_monitoring_review_incident_ids)}")
 
 
 if __name__ == "__main__":

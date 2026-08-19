@@ -1,0 +1,59 @@
+{
+  "incident_id": "INC-0009",
+  "detected_at": "2025-04-08",
+  "kind": "cost_anomaly",
+  "company_ids": [
+    "cascade"
+  ],
+  "agent_version": "v1",
+  "model": "claude-sonnet-4-20250514",
+  "input_snapshot": {
+    "company_id": "cascade",
+    "cost_usd": 11.8,
+    "trailing_avg": 5.133333333333334
+  },
+  "output_snapshot": {},
+  "risk_tier": "high",
+  "routing": "human_review",
+  "status": "reviewed",
+  "remediation_detail": "Cycle cost $11.80 is 130% above the trailing average $5.13 \u2014 a spend spike with no corresponding auto-remediation; a human should account for why.",
+  "resolved_by": "priya.nair@platform-reliability.example.com",
+  "human_note": "Reviewed \u2014 see the incident's own remediation_detail and policy_check for the full record.",
+  "counterfactual": null,
+  "policy_check": {
+    "cascade": {
+      "matched_clause_titles": [
+        "Cost and resource anomalies"
+      ],
+      "company_clauses": [
+        {
+          "title": "Error-budget reporting",
+          "text": "## Error-budget reporting\n\n`monthly_error_budget_consumed_pct` classified warning (\u226580%) for two or more consecutive\nreporting cycles must be reported to the Reliability Review Board at the next scheduled\nmeeting, regardless of trend direction \u2014 the shared policy's clause, restated here because it\nis the primary SLO Cascade is held against.",
+          "distance": 1.207855224609375
+        }
+      ],
+      "shared_clauses": [
+        {
+          "title": "Cost and resource anomalies",
+          "text": "## Cost and resource anomalies\n\nA cycle's LLM/tool-call spend running well above its own recent trailing average is not, by\nitself, evidence of anything the monitoring system can safely fix \u2014 there is no automated\n\"correct\" spend level to revert to. Any such anomaly must be routed to human review with the\ncomparison (this cycle's figure against the trailing average) attached, so a human can account\nfor the cause, rather than being silently absorbed into an unremarked cost trend.",
+          "distance": 0.8703476190567017
+        }
+      ],
+      "contributing_assessments": [
+        {
+          "agent": "slo-risk-tracker",
+          "version": "v1",
+          "model": "claude-sonnet-4-20250514",
+          "trajectory": "deteriorating",
+          "rationale": "Error budget climbed further to 91% from 82% \u2014 2nd consecutive warning-level cycle; RRB reporting clause applies regardless of trend direction."
+        }
+      ],
+      "checked": true,
+      "compliant": true,
+      "rationale": "Cycle spend well above trailing average, routed to human review with the comparison attached rather than silently absorbed \u2014 exactly what the clause requires."
+    }
+  },
+  "escalation_log": [],
+  "created_at": "2026-08-19T09:07:31.056573+00:00",
+  "reviewed_at": "2026-08-19T09:07:33.464709+00:00"
+}

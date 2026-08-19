@@ -57,7 +57,11 @@ an automated remediation, and it only ever does one specific, safe thing.
 ## Worked scenario 1: goal drift caught and auto-rolled-back
 
 **Actual numbers from this repo's real simulation run** (`scripts/simulate_production_run.py
---reset`, `data/scenario_facts.json`, `data/incidents/INC-0002.json`):
+--reset`, `data/scenario_facts.json`, `data/incidents/INC-0007.json`). Incident numbering
+shifted from an earlier build of this doc (this scenario was `INC-0002` before the extended
+monitoring dimensions were added — see `CLAUDE.md`) because 8 new finding kinds are now
+interleaved into the same 10-cycle run; the narrative and every quoted fact below are
+unchanged, only the ID.
 
 - `change-impact-synthesizer` activation history
   (`registry/change-impact-synthesizer/activation_log.jsonl`): `v1` (initial-deployment) →
@@ -78,21 +82,23 @@ an automated remediation, and it only ever does one specific, safe thing.
   specific finding). `risk_scoring.check_systemic_flag_spike` fired on
   `["meridian", "wayfinder"]` (2 of 3 companies, threshold 2) → `risk_tier=critical`,
   `routing=auto_rollback`.
-- Incident **`INC-0002`** created, `kind=systemic_flag_spike`, `status=auto_resolved`.
+- Incident **`INC-0007`** created, `kind=systemic_flag_spike`, `status=auto_resolved`.
   `soft_fix.auto_rollback_to_last_known_good("change-impact-synthesizer", ...)` reverted to
   `v2` in the same cycle — confirmed by `registry/change-impact-synthesizer/active.yaml`
-  showing `activated_by: pulse-auto-rollback` after the run.
+  showing `activated_by: pulse-auto-rollback` and the same `reason` text quoted above, after
+  the run.
 - The incident's attached counterfactual (what `v2` would have said on the *identical*
   input): `{"read": "noise", ...}` for both companies → would have classified both
   `on_charter`. Both companies stayed clean the very next cycle (S07 onward) under the
   restored `v2`, corroborating the rollback was correct.
 - `scripts/investigate_incident.py` and `scripts/reproducibility_check.py` both run against
-  `INC-0002` directly from disk — see their real output in
+  `INC-0007` directly from disk — see their real output in
   `PRODUCTION_READINESS_REPORT.md`.
 
 ## Worked scenario 2: a genuine model boundary, routed to a human
 
-**Actual numbers from the same run** (`data/incidents/INC-0004.json`):
+**Actual numbers from the same run** (`data/incidents/INC-0013.json`, previously `INC-0004`
+before the extended-monitoring incident kinds were interleaved into this run):
 
 - Wayfinder's `change-impact-synthesizer` classifying entries for 2025-S08 and 2025-S09 both
   carry `agent_version: v2` (unchanged, already rolled back from the S06 incident) — but the
@@ -108,7 +114,7 @@ an automated remediation, and it only ever does one specific, safe thing.
   restored v2 prompt, would not have.
 - `risk_scoring.check_model_boundary_ambiguity("model_boundary")` →
   `risk_tier=high, routing=human_review` — **unconditional**, regardless of confidence.
-  Incident **`INC-0004`** created, `status=pending_review`.
+  Incident **`INC-0013`** created, `status=pending_review`.
 - This is the direct application of the policy clause quoted in
   `policy/monitoring_escalation_policy.md`: *"Any classification change attributable to a
   change in the underlying model or agent version, rather than a change in the monitored
@@ -123,7 +129,8 @@ an automated remediation, and it only ever does one specific, safe thing.
 
 ## Worked scenario 3: a destructive layer change, never auto-executed
 
-**Actual numbers from the same run** (`data/incidents/INC-0003.json`):
+**Actual numbers from the same run** (`data/incidents/INC-0011.json`, previously `INC-0003`
+before the extended-monitoring incident kinds were interleaved into this run):
 
 - 2025-S08: Cascade's `database` layer proposed a schema migration —
   `DROP TABLE raw_events_archive (4.2M rows)` — flagged `reversible: false` in its
@@ -132,20 +139,56 @@ an automated remediation, and it only ever does one specific, safe thing.
   classified this `destructive_change_candidate` — purely from the literal `reversible` flag,
   no judgment call, no agent involved.
 - `risk_scoring.check_destructive_layer_change(...)` fired unconditionally →
-  `risk_tier=critical`, `routing=pending_human_approval`. Incident **`INC-0003`** created,
+  `risk_tier=critical`, `routing=pending_human_approval`. Incident **`INC-0011`** created,
   `status=pending_human_approval`.
 - `pulse.human_approval.gate_destructive_action(...)` was called and returned
   `{"action_taken": False, "status": "pending_human_approval", ...}` — the migration was
   **not executed**. No code path in this repository could have executed it at this point;
   the module has exactly one function and it never returns `action_taken: True`.
 - Only afterward, as a separate and explicit step, was
-  `pulse.incidents.record_approval_decision("INC-0003", "approved", ...)` called, with
+  `pulse.incidents.record_approval_decision("INC-0011", "approved", ...)` called, with
   `resolved_by: "morgan.reyes@data-governance.example.com"` and the note *"Confirmed
   pre-approved by data governance; cold-storage migration of raw_events_archive verified
   complete before the drop."* Final status: `approved`. Recording that decision performs no
   action itself — actually applying the migration is a deliberate step outside this system's
   own authority, exactly as `policy/monitoring_escalation_policy.md`'s "Destructive and
   irreversible layer changes" clause requires.
+
+## Worked scenario 4: an extended-monitoring finding, gated by risk tier and checked against real policy
+
+**Actual numbers from the same run** (`data/incidents/INC-0010.json`) — one of the eight
+finding kinds added for extended monitoring (`CLAUDE.md`), demonstrating both the risk-tiered
+routing split those new checks share with `company_agent_regression`, and the real per-company
+policy check every incident (old kind or new) now gets.
+
+- 2025-S07: Meridian's own `escalation-agent` and `resolution-agent` bounced the same
+  refund-dispute ticket back and forth 10 times in one session — each side re-routing it to
+  the other rather than resolving or escalating to a human.
+  `pulse.agent_loop_detection.max_repeat_run(...)` counted this for real from the literal call
+  sequence (10, against a threshold of 5) — not a judgment call.
+- `risk_scoring.check_agent_loop(10, threshold=5)` → `10 >= threshold * 2`, so
+  `risk_tier=high, routing=pending_human_approval` — this finding's exact mirror of
+  `check_company_agent_regression`'s tiering contract: a low/medium-severity loop would have
+  auto-rolled-back the agent with no human in the loop (reusing
+  `pulse.company_rollback.auto_rollback_company_agent`, the same reasoning as any other
+  auto-rollback — the prior version wasn't looping); at high severity it is never
+  auto-executed. Incident **`INC-0010`** created, `status=pending_human_approval`.
+- Immediately after creation, `pulse.orchestrator._apply_policy_check` ran
+  `policy-compliance-checker` for real against Meridian specifically: one company-scoped
+  search (`search_company_policy("meridian", ...)`, matching Meridian's own "Internal agent
+  regression handling" clause, since re-worded to explicitly cover hand-off loops) and one
+  shared search (`search_policy(...)`, matching the new "Agent hand-off loops" clause in
+  `policy/monitoring_escalation_policy.md`) — both real chromadb semantic-search calls, not
+  scripted matches. The result (`compliant: true`, both clause titles cited) is attached
+  directly to `INC-0010`'s own `policy_check` field, visible in the incident detail modal in
+  `dashboard/web`.
+- `pulse.incidents.record_approval_decision("INC-0010", "approved", ...)` was called with
+  `resolved_by: "priya.nair@platform-reliability.example.com"` and the note *"Confirmed real
+  hand-off loop, not a legitimate multi-step escalation. Approved manual rollback of
+  escalation-agent outside this system's own authority."* — recording the decision performs
+  no rollback itself; unlike the low/medium tier, nothing in this codebase acts on a high-tier
+  agent-loop finding automatically, by the same design as every other high-risk finding in
+  this system.
 
 ## Why `compound_boundary` should never happen in a real deployment
 

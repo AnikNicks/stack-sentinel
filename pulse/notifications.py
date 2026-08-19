@@ -293,6 +293,70 @@ def dispatch_for_incident(incident: dict[str, Any]) -> list[dict[str, Any]]:
             channel="slack", target=SLACK_CHANNEL_ID, purpose="company_agent_regression",
             detail={"text": text}, incident_id=incident["incident_id"],
         ))
+    elif kind == "policy_violation":
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose="policy_violation",
+            detail={"text": f"[Stack Sentinel] POLICY CHECK FAILED: policy-compliance-checker "
+                             f"flagged {', '.join(company_ids)}'s routing decision as non-compliant "
+                             f"— routed to human_review, not auto-corrected. "
+                             f"Incident {incident['incident_id']}."},
+            incident_id=incident["incident_id"],
+        ))
+    elif kind == "pii_exposure":
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose="pii_exposure",
+            detail={"text": f"[Stack Sentinel] DATA EXPOSURE: real PII pattern(s) detected in "
+                             f"{', '.join(company_ids)}'s own output — already exposed, routed "
+                             f"to human review for incident response. Incident {incident['incident_id']}."},
+            incident_id=incident["incident_id"],
+        ))
+    elif kind == "prompt_injection_succeeded":
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose="prompt_injection_succeeded",
+            detail={"text": f"[Stack Sentinel] SECURITY: an injection attempt against "
+                             f"{', '.join(company_ids)} coincided with a real behavior change this "
+                             f"cycle — treated as a successful compromise, escalated to human review. "
+                             f"Incident {incident['incident_id']}."},
+            incident_id=incident["incident_id"],
+        ))
+    elif kind == "agent_loop_detected":
+        if incident["routing"] == "auto_rollback":
+            text = (f"[Stack Sentinel] AUTO-ROLLBACK: a hand-off loop was detected in "
+                    f"{', '.join(company_ids)} — auto-rolled back to the last known-good version, "
+                    f"no human gate required. Incident {incident['incident_id']}.")
+        else:
+            text = (f"[Stack Sentinel] BLOCKED — PENDING HUMAN APPROVAL: a hand-off loop in "
+                    f"{', '.join(company_ids)} crossed into the high-risk tier — NOT rolled back "
+                    f"automatically. Incident {incident['incident_id']}.")
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose="agent_loop_detected",
+            detail={"text": text}, incident_id=incident["incident_id"],
+        ))
+    elif kind == "canary_divergence":
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose="canary_divergence",
+            detail={"text": f"[Stack Sentinel] BLOCKED — PENDING HUMAN APPROVAL: a candidate "
+                             f"version for {', '.join(company_ids)} diverges from the active "
+                             f"version's decision on the same input — held before any promotion. "
+                             f"Incident {incident['incident_id']}."},
+            incident_id=incident["incident_id"],
+        ))
+    elif kind == "groundedness_failure":
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose="groundedness_failure",
+            detail={"text": f"[Stack Sentinel] CONTENT QUALITY: groundedness-checker flagged a "
+                             f"{', '.join(company_ids)} output as not supported by its retrieved "
+                             f"source — routed to human review. Incident {incident['incident_id']}."},
+            incident_id=incident["incident_id"],
+        ))
+    elif kind in ("cost_anomaly", "context_pressure", "user_escalation_spike"):
+        records.append(_record(
+            channel="slack", target=SLACK_CHANNEL_ID, purpose=kind,
+            detail={"text": f"[Stack Sentinel] {kind.replace('_', ' ').upper()}: "
+                             f"{', '.join(company_ids)} — {incident['remediation_detail']} "
+                             f"Incident {incident['incident_id']}."},
+            incident_id=incident["incident_id"],
+        ))
 
     records += _dispatch_universal_email_if_high_risk(
         company_id=",".join(company_ids), purpose=kind, risk_tier=incident["risk_tier"],

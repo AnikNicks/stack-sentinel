@@ -8,7 +8,7 @@ behavior-boundary incidents — never a smoothed trend line that just relabels a
 
 This project started as `portfolio-pulse`, a PE/private-debt financial-monitoring demo built
 around the same deterministic/agentic architecture. This build is a full domain pivot — the
-underlying architecture (deterministic core, six single-shot classifiers, versioned rollback)
+underlying architecture (deterministic core, seven single-shot classifiers, versioned rollback)
 carries over unchanged; everything the system actually *monitors* was rebuilt from scratch.
 Local-only for now: no live notification delivery, no GitHub Pages republish, no separate git
 repo per company — all deliberately deferred, later, user-approved steps.
@@ -41,7 +41,7 @@ The architectural answer to all four is the same: **push everything that can be
 deterministic out of the model entirely.** Version management, the trend store, risk scoring,
 rollback, layer-change detection, model-boundary detection, and the literal/countable parts
 of policy compliance are plain, unit-tested Python with zero LLM involvement. The only places
-a model is involved are six single-shot Claude Code subagents — each invoked once, given a
+a model is involved are seven single-shot Claude Code subagents — each invoked once, given a
 bounded context, producing one JSON classification. Nothing in this system asks a model to
 plan, loop, or decide whether it needs more information; see
 [Project architecture](#project-architecture) for why that structurally rules out an entire
@@ -67,8 +67,9 @@ category of agent failure mode.
   `pulse/human_approval.gate_destructive_action` has no branch that returns `action_taken:
   True`. See `VERSIONING.md`'s worked scenario 3 for a real incident that reached this gate.
 - **A live operator console, not a static export.** `dashboard/api` (FastAPI) +
-  `dashboard/web` (React) — six pages including the one real write action in the whole
-  system, approving or rejecting a pending destructive-change incident.
+  `dashboard/web` (React) — System / Ask / Companies / Incidents, including the one real
+  write action in the whole system, approving or rejecting a pending destructive-change (or
+  other high-risk) incident.
 - **Three illustrative product demos.** `companies/*` — one React app per monitored company,
   each dramatizing that company's real charter boundary or SLO in a clickable product
   surface, plus a data-driven replay of its real 10-cycle monitoring history. Read-only:
@@ -81,9 +82,9 @@ real story:
 
 | Company | Track | Tracked against | What happened |
 |---|---|---|---|
-| Meridian Labs — "Meridian Concierge" | CHARTER | Agent behavior boundaries (refund approval, shipping-address confirmation) | A prompt regression misread a benign audit-log artifact as attributable, alongside Wayfinder in the same cycle — caught by the systemic-flag-spike rule and **auto-rolled-back**, no human involved (`INC-0002`) |
-| Wayfinder AI — "Wayfinder Copilot" | CHARTER | Agent behavior boundaries (non-refundable-booking confirmation) | Same prompt version, different underlying model snapshot, one cycle apart — a genuine **model-boundary event**, unconditionally routed to human review (`INC-0004`) |
-| Cascade Analytics — "Cascade Pipeline Agent" | SLO | Monthly error-budget consumption | Two consecutive warning-threshold cycles trip the RRB reporting clause (real dispatch); a proposed non-reversible schema drop is flagged and **blocked pending human approval** (`INC-0003`), later explicitly approved |
+| Meridian Labs — "Meridian Concierge" | CHARTER | Agent behavior boundaries (refund approval, shipping-address confirmation) | A prompt regression misread a benign audit-log artifact as attributable, alongside Wayfinder in the same cycle — caught by the systemic-flag-spike rule and **auto-rolled-back**, no human involved (`INC-0007`). Separately, its own `escalation-agent` gets caught in a real hand-off loop with `resolution-agent`, high-risk-tiered and held for human approval (`INC-0010`) |
+| Wayfinder AI — "Wayfinder Copilot" | CHARTER | Agent behavior boundaries (non-refundable-booking confirmation) | Same prompt version, different underlying model snapshot, one cycle apart — a genuine **model-boundary event**, unconditionally routed to human review (`INC-0013`). A real card-like number surfaces in a booking confirmation, flagged as a **PII exposure** (`INC-0006`) |
+| Cascade Analytics — "Cascade Pipeline Agent" | SLO | Monthly error-budget consumption | Two consecutive warning-threshold cycles trip the RRB reporting clause (real dispatch); a proposed non-reversible schema drop is flagged and **blocked pending human approval** (`INC-0011`), later explicitly approved. A schema-inference summary is caught **fabricating** a field its own retrieved source never defines (`INC-0014`, `groundedness-checker`) |
 
 ![Console overview — three companies, real classifications](docs/screenshots/01-overview.jpg)
 
@@ -105,7 +106,7 @@ error-budget gauge and the blocked destructive migration:
 
 <img src="docs/screenshots/project-architecture.svg" alt="Stack Sentinel architecture: a per-cycle system snapshot flows into an orchestrator, which routes CHARTER companies through goal-drift-tracker and change-impact-synthesizer and SLO companies through deterministic error-budget math and slo-risk-tracker, into a trend store and two distinct deterministic detection paths (layer_versioning.py for the monitored system's own changes, model_boundary.py for Stack Sentinel's own classifier drift), into deterministic risk scoring, which branches to an automatic rollback, model-boundary-interpreter with mandatory human review, or human_approval.py's destructive-change gate that can never auto-execute — all feeding real notifications, with portfolio-rollup-writer as a separate on-demand report and two read-only web UIs consuming the same data" width="720">
 
-Six subagents, each a single-shot classifier with a retrieval scope sized to exactly what its
+Seven subagents, each a single-shot classifier with a retrieval scope sized to exactly what its
 judgment needs — not "always retrieve everything":
 
 | Agent | Retrieval scope | Invoked | Produces |
@@ -115,7 +116,8 @@ judgment needs — not "always retrieve everything":
 | `change-impact-synthesizer` | Last 4–6 cycles of trend history | Once per company per cycle, CHARTER and SLO alike | Attributable-vs-noise verdict — the causal-attribution gate on CHARTER's final classification |
 | `model-boundary-interpreter` | Exactly the two trend entries bracketing a detected boundary | Only when `model_boundary.py` already deterministically found one | Genuine-change vs. model-interpretation-noise judgment |
 | `portfolio-rollup-writer` | Latest entry per company, portfolio-wide | Once per reporting cycle | One cross-company report |
-| `policy-compliance-checker` | Policy corpus only — **deliberately no trend history at all** | Once per routing decision needing a policy check | Borderline "intent of the clause" judgment |
+| `policy-compliance-checker` | Policy corpus (company-scoped + shared) only — **deliberately no trend history at all** | Once per incident's routing decision, per company named on it | Borderline "intent of the clause" judgment |
+| `groundedness-checker` | **Zero tool calls** — just the generated output excerpt and its source excerpt, pushed directly | Once per `groundedness_check` event | `grounded` / `unsupported` / `fabricated` judgment |
 
 That last row is the clearest example in this system of *excluding* memory on purpose, not
 just bounding it — pulling episodic trend data into a policy-compliance judgment adds noise,
@@ -183,7 +185,7 @@ Stated honestly — what's enforced by code versus what's prompt-level disciplin
 ## Repository structure
 
 ```
-.claude/agents/           six subagent definitions — single-shot classifiers, not planners
+.claude/agents/           seven subagent definitions — single-shot classifiers, not planners
 pulse/                    deterministic core: trend store, layer versioning, risk scoring, rollback, human approval, notifications
 mcp_server/               MCP server (server.py) + real tool implementations (tools_impl.py)
 registry/<agent>/         versioned prompt bundles (v1.yaml, v2.yaml, ...) + active.yaml
@@ -229,7 +231,7 @@ cd companies\cascade-analytics && npm install && npm run dev
 
 ## Roadmap
 
-- The six subagents are spec-verified (frontmatter, retrieval scopes, tool caps, JSON
+- The seven subagents are spec-verified (frontmatter, retrieval scopes, tool caps, JSON
   contracts) but have never been invoked over a live `claude` CLI round-trip in this build —
   `simulate_production_run.py` feeds scripted stand-in classifications into the real
   orchestrator/risk-scoring/notification pipeline; only the classification *text* is

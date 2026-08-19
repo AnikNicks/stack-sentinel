@@ -2,5 +2,5 @@ company_id: cascade
 agent: schema-inference-agent
 active_version: v1
 activated_by: initial-deployment
-activated_at: '2026-08-18T15:14:36.315916+00:00'
+activated_at: '2026-08-19T09:07:26.908463+00:00'
 reason: Initial production deployment.

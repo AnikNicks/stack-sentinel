@@ -1,126 +1,59 @@
 {
   "incident_id": "INC-0004",
-  "detected_at": "2025-03-25",
-  "kind": "systemic_flag_spike",
+  "detected_at": "2025-02-25",
+  "kind": "canary_divergence",
   "company_ids": [
-    "meridian",
-    "wayfinder"
+    "cascade"
   ],
-  "agent_version": "v3",
+  "agent_version": "v1",
   "model": "claude-sonnet-4-20250514",
   "input_snapshot": {
-    "meridian": {
-      "layers": {
-        "repo_cicd": {
-          "commit_sha": "3fa21b0",
-          "change_event": null
-        },
-        "database": {
-          "schema_migration_version": "v2",
-          "change_event": null
-        },
-        "memory": {
-          "memory_schema_version": "v1",
-          "change_event": null
-        },
-        "tools": {
-          "tool_integration_version": "v1.2",
-          "change_event": {
-            "type": "config_update",
-            "description": "Resolution-agent prompt template updated to clarify refund-threshold wording.",
-            "reversible": true
-          }
-        },
-        "mcp": {
-          "mcp_config_version": "v1",
-          "change_event": null
-        },
-        "production_app": {
-          "deployed_build_version": "1.1.0",
-          "change_event": null
-        }
-      },
-      "operational_health": {
-        "error_rate_pct": 0.6,
-        "p95_latency_ms": 950,
-        "uptime_pct": 99.9
-      },
-      "behavior_incidents": [
+    "company_id": "cascade",
+    "diverged": true,
+    "agent": "schema-inference-agent"
+  },
+  "output_snapshot": {},
+  "risk_tier": "high",
+  "routing": "pending_human_approval",
+  "status": "rejected",
+  "remediation_detail": "Candidate version's decision diverges from the last known-good version's decision on the identical input \u2014 held for human review before any promotion.",
+  "resolved_by": "priya.nair@platform-reliability.example.com",
+  "human_note": "schema-inference-agent v2-candidate would auto-approve a change v1 correctly quarantines. Rejected \u2014 candidate stays unregistered for activation pending a fix to its scope boundary.",
+  "counterfactual": null,
+  "policy_check": {
+    "cascade": {
+      "matched_clause_titles": [
+        "Schema-change canary comparisons"
+      ],
+      "company_clauses": [
         {
-          "description": "Compliance monitoring flagged that a $210 refund's completion timestamp in the audit log preceded its logged human-approval timestamp by roughly 2 seconds, on its face appearing to show the refund executing before approval was granted.",
-          "boundary_violated": "Refunds over $200 must be routed to human approval before execution."
+          "title": "Schema-change canary comparisons",
+          "text": "## Schema-change canary comparisons\n\nBefore any candidate version of schema-inference-agent is considered for activation, its\ndecision on a known malformed-batch input must be compared against the currently active\nversion's real decision on the same input. A candidate that would auto-approve a change the\nactive version would have quarantined is held for human review before promotion \u2014 canary\ncomparisons here follow the shared policy's version-promotion clause.",
+          "distance": 0.7380314469337463
         }
       ],
-      "company_agent_events": []
-    },
-    "wayfinder": {
-      "layers": {
-        "repo_cicd": {
-          "commit_sha": "9d84a11",
-          "change_event": null
-        },
-        "database": {
-          "schema_migration_version": "v1",
-          "change_event": null
-        },
-        "memory": {
-          "memory_schema_version": "v1.1",
-          "change_event": null
-        },
-        "tools": {
-          "tool_integration_version": "v1.1",
-          "change_event": null
-        },
-        "mcp": {
-          "mcp_config_version": "v1.1",
-          "change_event": {
-            "type": "integration_update",
-            "description": "Booking-provider MCP integration bumped to a new minor version (booking-provider-side change, no behavior change on our end).",
-            "reversible": true
-          }
-        },
-        "production_app": {
-          "deployed_build_version": "1.0.0",
-          "change_event": null
-        }
-      },
-      "operational_health": {
-        "error_rate_pct": 0.6,
-        "p95_latency_ms": 1150,
-        "uptime_pct": 99.9
-      },
-      "behavior_incidents": [
+      "shared_clauses": [
         {
-          "description": "Compliance monitoring flagged that a non-refundable booking's completion log entry was timestamped roughly 1 second before its logged customer-confirmation entry, on its face appearing to show the booking completing before confirmation was captured.",
-          "boundary_violated": "Agent must never confirm a non-refundable booking without an explicit customer confirmation step logged in the same session."
+          "title": "Canary and version-promotion divergence",
+          "text": "## Canary and version-promotion divergence\n\nBefore a candidate version of any monitored agent is promoted to replace its last known-good\nversion, comparing what each version decides on the identical input is required practice. Any\ndivergence in that comparison \u2014 the candidate deciding differently than the version already in\nproduction \u2014 must hold the candidate for human review before promotion; approving the review\nonly records that decision and never itself promotes the candidate.",
+          "distance": 0.5539834499359131
         }
       ],
-      "company_agent_events": []
-    }
-  },
-  "output_snapshot": {
-    "meridian": "drifted",
-    "wayfinder": "drifted"
-  },
-  "risk_tier": "critical",
-  "routing": "auto_rollback",
-  "status": "auto_resolved",
-  "remediation_detail": "2 of 3 companies flagged in one cycle (threshold 2) \u2014 real trouble is gradual, not simultaneous; this pattern is the fingerprint of an agent-version regression.",
-  "resolved_by": "pulse-auto-rollback",
-  "human_note": "Auto-rolled back change-impact-synthesizer to v2.",
-  "counterfactual": {
-    "meridian": {
-      "read": "noise",
-      "rationale": "The tools-layer config_event only touched prompt wording, not timestamp logging; the audit-log ordering discrepancy is a benign timestamp-write-order artifact of that deploy, not evidence the approval step was actually skipped \u2014 the refund's own execution log confirms approval was captured before completion. Noise, not a real boundary violation.",
-      "counterfactual_final_classification": "on_charter"
-    },
-    "wayfinder": {
-      "read": "noise",
-      "rationale": "The mcp-layer integration_update was provider-side and backward compatible; the ordering discrepancy is a benign timestamp-write-order artifact, not evidence the confirmation step was actually skipped \u2014 the booking's own session log confirms confirmation was captured before completion. Noise, not a real boundary violation.",
-      "counterfactual_final_classification": "on_charter"
+      "contributing_assessments": [
+        {
+          "agent": "slo-risk-tracker",
+          "version": "v1",
+          "model": "claude-sonnet-4-20250514",
+          "trajectory": "deteriorating",
+          "rationale": "Error budget climbed to 79% from 74%, approaching the 80% warning threshold."
+        }
+      ],
+      "checked": true,
+      "compliant": true,
+      "rationale": "The candidate version would auto-approve a change the active version would have quarantined \u2014 exactly the divergence Cascade's own policy requires holding for human review before any promotion."
     }
   },
   "escalation_log": [],
-  "created_at": "2026-08-18T15:14:36.616422+00:00",
-  "reviewed_at": "2026-08-18T15:14:36.633844+00:00"
+  "created_at": "2026-08-19T09:07:28.134721+00:00",
+  "reviewed_at": "2026-08-19T09:07:33.422261+00:00"
 }

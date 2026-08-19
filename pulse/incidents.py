@@ -49,6 +49,7 @@ def create_incident(
     input_snapshot: dict[str, Any], output_snapshot: dict[str, Any],
     risk_tier: str, routing: str, detected_at: str,
     remediation_detail: str = "", counterfactual: dict[str, Any] | None = None,
+    policy_check: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create and persist a new incident replay bundle. detected_at is the SIMULATED cycle
     date (not wall-clock time), so the record stays meaningful when replayed later."""
@@ -76,6 +77,7 @@ def create_incident(
         "resolved_by": None,
         "human_note": None,
         "counterfactual": counterfactual,
+        "policy_check": policy_check,
         "escalation_log": [],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -113,6 +115,18 @@ def list_incidents(status: str | None = None, kind: str | None = None) -> list[d
             continue
         results.append(bundle)
     return results
+
+
+def attach_policy_check(incident_id: str, policy_check: dict[str, Any]) -> dict[str, Any]:
+    """Attach policy-compliance-checker's real, per-company judgment (keyed by company_id) to
+    an already-created incident. A separate write from create_incident's own policy_check
+    param because the check runs AFTER the incident exists (it cites the incident's own
+    routing decision in its search query) — this is not a human review or an authorization,
+    just recording what the compliance check found."""
+    bundle = get_incident(incident_id)
+    bundle["policy_check"] = policy_check
+    _save(bundle)
+    return bundle
 
 
 def record_human_review(incident_id: str, resolved_by: str, human_note: str,

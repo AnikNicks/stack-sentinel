@@ -1,0 +1,10 @@
+version: v1
+agent: groundedness-checker
+created: '2025-01-06'
+changelog: 'Initial release: judges whether a company agent''s generated output is
+  grounded in, unsupported by, or fabricated against its retrieved source excerpt.'
+prompt_file: .claude/agents/groundedness-checker.md
+tool_scope: []
+model: claude-sonnet-4-20250514
+objective_statement: Judge whether a generated output's claim is actually supported
+  by the specific source excerpt it cites.

@@ -2,7 +2,7 @@ company_id: meridian
 agent: intake-triage-agent
 active_version: v1
 activated_by: pulse-auto-rollback
-activated_at: '2026-08-18T15:14:36.462385+00:00'
+activated_at: '2026-08-19T09:07:27.078871+00:00'
 reason: "intake-triage-agent (meridian) flagged low-risk \u2014 reverting to its last\
   \ known-good version automatically, no human gate required. A routine prompt-template\
   \ deploy to intake-triage-agent (v2) began occasionally mis-tagging low-priority\

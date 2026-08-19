@@ -16,6 +16,7 @@
   "resolved_by": null,
   "human_note": null,
   "counterfactual": null,
+  "policy_check": null,
   "escalation_log": [
     {
       "escalated_at": "2025-03-01",
@@ -23,5 +24,5 @@
       "new_risk_tier": "critical"
     }
   ],
-  "created_at": "2026-08-18T15:14:36.285480+00:00"
+  "created_at": "2026-08-19T09:07:26.871879+00:00"
 }

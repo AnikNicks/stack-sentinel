@@ -23,8 +23,23 @@ scoring, idempotency, rollback, and the literal/countable parts of policy compli
 **plain, deterministic Python with zero LLM involvement**. A monitoring system whose own
 logic is unpredictable defeats its purpose. All of that code lives in `pulse/` and is fully
 unit-tested without any model calls. The only places an LLM (a Claude Code subagent) is
-involved are the six single-shot classifiers in `.claude/agents/` — and even there, their job
+involved are the seven single-shot classifiers in `.claude/agents/` — and even there, their job
 is narrow classification, not open-ended reasoning.
+
+This same discipline governs the extended monitoring dimensions added after the initial build
+(cost anomalies, context-window pressure, PII exposure, prompt-injection response, agent
+hand-off loops, canary/version divergence, user-escalation rate): each is real deterministic
+Python (`pulse/pii_scan.py`, `pulse/injection_monitoring.py`, `pulse/agent_loop_detection.py`,
+`pulse/canary_comparison.py`, plus threshold/trailing-average checks in `pulse/risk_scoring.py`)
+operating on realistic scripted input, never a pre-baked verdict. Exactly one of these eight
+new checks — groundedness — genuinely cannot be reduced to a literal fact ("does this output's
+claim actually match its source" is a real semantic judgment), which is why it's the one case
+that got a **new** agent (`groundedness-checker`) rather than another deterministic check. All
+twelve finding kinds in this system (the original four plus these eight) now share one
+uniform incident lifecycle, `pulse/orchestrator._route_finding()` — create the incident, run
+its prescribed action (auto-rollback, the pending-human-approval gate, or nothing further for
+human_review), dispatch, then check policy compliance — rather than each kind repeating that
+sequence.
 
 **One further non-negotiable specific to this domain:** destructive or irreversible changes to
 a monitored system's layers (a database schema drop, an unrecoverable credential rotation,
@@ -84,11 +99,15 @@ what it's allowed to pull, sized to what its judgment actually needs:
   point-in-time summary, not a trend analysis.
 - `policy-compliance-checker`: deliberately does **not** retrieve trend history at all — see
   `MEMORY.md` for why this is the concrete "when to ignore memory" case in this system.
+- `groundedness-checker`: **zero tool calls at all** — the orchestrator pushes it exactly the
+  generated output excerpt and the source excerpt it's judged against, directly, every
+  invocation. Nothing else is relevant to "does this specific claim match this specific
+  source," so nothing else is retrievable — the narrowest retrieval scope in the system.
 
 ## What's real vs. scripted in this repo
 
 Every deterministic module in `pulse/` is real, executed code with real tests. The MCP server
-and the six subagents are complete, spec-correct artifacts, but no live `claude` CLI session
+and the seven subagents are complete, spec-correct artifacts, but no live `claude` CLI session
 was available to invoke the agents themselves during this build — so
 `scripts/simulate_production_run.py` feeds *scripted* classification outputs (explicitly
 labeled as stand-ins for what those agents would return) into the *real*

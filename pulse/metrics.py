@@ -12,10 +12,33 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
+import json
+
 from pulse import incidents as incidents_module
 from pulse import policy_rules
 from pulse.audit_log import read_log
+from pulse.paths import LAYER_METRICS_DIR
 from pulse.trend_store import get_trend_history, list_companies_with_history
+
+# Each agent's own documented retrieval scope (its .claude/agents/<agent>.md `tools:`
+# frontmatter) — the allowlist unexpected_tool_calls() checks real audit_log entries against.
+# Sourced from the prompt files, not invented: a call outside this set is a real deviation
+# from what that agent's own spec says it does.
+#
+# Note: pulse/orchestrator.py attributes the shared get_trend_history/append_trend_entry calls
+# in each per-company cycle to that track's primary agent (goal-drift-tracker for CHARTER,
+# slo-risk-tracker for SLO) — change-impact-synthesizer and model-boundary-interpreter receive
+# that same fetched history pushed to them directly rather than calling a tool themselves, per
+# their own retrieval-scope docs, so their real audit-log footprint is legitimately empty.
+EXPECTED_TOOLS: dict[str, set[str]] = {
+    "goal-drift-tracker": {"get_system_charter", "get_system_metrics", "get_trend_history", "append_trend_entry"},
+    "slo-risk-tracker": {"get_slo_agreement", "get_system_metrics", "get_trend_history", "append_trend_entry"},
+    "change-impact-synthesizer": set(),
+    "model-boundary-interpreter": set(),
+    "portfolio-rollup-writer": {"list_portfolio_companies", "get_trend_history"},
+    "policy-compliance-checker": {"search_policy", "search_company_policy"},
+    "groundedness-checker": set(),
+}
 
 
 def classification_consistency(agent: str, company_id: str) -> dict[str, Any]:
@@ -105,10 +128,103 @@ def approval_turnaround() -> list[dict[str, Any]]:
     return results
 
 
+def schema_compliance_rate(company_id: str) -> dict[str, Any]:
+    """Pure rollup, zero new data: what fraction of this company's recorded cycles ended in
+    `assessment_failed` (a real schema-validation miss on the classifying agent's output) —
+    tracking the RATE over time surfaces a slow-creeping regression well before it would show
+    up as a single dramatic failure."""
+    entries = get_trend_history(company_id)
+    if not entries:
+        return {"company_id": company_id, "total_cycles": 0, "assessment_failed_count": 0,
+                "compliance_rate_pct": None}
+    failed = sum(1 for e in entries if e.get("classification") == "assessment_failed")
+    return {
+        "company_id": company_id, "total_cycles": len(entries), "assessment_failed_count": failed,
+        "compliance_rate_pct": round(100 * (1 - failed / len(entries)), 1),
+    }
+
+
+def unexpected_tool_calls(agent: str) -> list[dict[str, Any]]:
+    """Pure rollup, zero new data: real audit_log entries for `agent` naming a tool outside
+    its own documented allowlist (EXPECTED_TOOLS, sourced from its .claude/agents/*.md spec) —
+    a real deviation from what that agent's own retrieval-scope section says it does."""
+    expected = EXPECTED_TOOLS.get(agent, set())
+    return [
+        {"tool_name": e["tool_name"], "timestamp": e["timestamp"], "args": e["args"]}
+        for e in read_log()
+        if e["agent"] == agent and e["tool_name"] not in expected
+    ]
+
+
+def approval_quality_flags(min_review_minutes: float = 5.0) -> list[dict[str, Any]]:
+    """Pure rollup, zero new data: for every decided incident, minutes elapsed between the
+    incident's real wall-clock created_at and its real wall-clock reviewed_at (both are real
+    datetime.now() timestamps in pulse/incidents.py — unlike approval_turnaround's detected_at,
+    which is the simulated cycle date, so this avoids that function's documented clock
+    mismatch). Flags a decision that came back suspiciously fast as a rubber-stamp candidate —
+    never proof of one, just something a human reviewing this rollup should notice.
+
+    Known limitation in this simulated environment: scripts/simulate_production_run.py's
+    entire 10-cycle run executes in seconds of real wall-clock time, so every scripted
+    approval in that run will flag here regardless of min_review_minutes — an artifact of the
+    demo's compressed timeline, not a real finding. In a real deployment, decisions are made
+    on their own real schedule and this figure is meaningful as-is."""
+    from datetime import datetime as _datetime
+    flags = []
+    for bundle in incidents_module.list_incidents():
+        if bundle["status"] not in ("approved", "rejected") or not bundle.get("reviewed_at"):
+            continue
+        created = _datetime.fromisoformat(bundle["created_at"])
+        reviewed = _datetime.fromisoformat(bundle["reviewed_at"])
+        minutes = (reviewed - created).total_seconds() / 60
+        flags.append({
+            "incident_id": bundle["incident_id"], "status": bundle["status"],
+            "review_minutes": round(minutes, 2),
+            "rubber_stamp_candidate": minutes < min_review_minutes,
+        })
+    return flags
+
+
+def security_scan_summary() -> dict[str, Any]:
+    """Pure rollup, zero new incident-log data: reads security_quality_events directly out of
+    the fixed data/layer_metrics/*.json input files (same treatment as
+    list_companies_with_history reading real files) and counts how many pii_scan/injection_scan
+    events were present across the whole portfolio, vs. how many pulse/pii_scan.py and
+    pulse/injection_monitoring.py actually flagged for real when the simulation ran."""
+    from pulse import injection_monitoring, pii_scan
+
+    totals = {"pii_scans_run": 0, "pii_detected": 0,
+              "injection_scans_run": 0, "injection_marker_hits": 0}
+    if not LAYER_METRICS_DIR.exists():
+        return totals
+    for path in sorted(LAYER_METRICS_DIR.glob("*.json")):
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        for cycle in data.get("cycles", {}).values():
+            for event in cycle.get("security_quality_events", []):
+                if event.get("type") == "pii_scan":
+                    totals["pii_scans_run"] += 1
+                    if pii_scan.scan(event.get("text", "")):
+                        totals["pii_detected"] += 1
+                elif event.get("type") == "injection_scan":
+                    totals["injection_scans_run"] += 1
+                    if injection_monitoring.scan(event.get("text", "")):
+                        totals["injection_marker_hits"] += 1
+    return totals
+
+
 def system_health_summary() -> dict[str, Any]:
     """One rollup combining all of the above, for the dashboard's system-health panel."""
+    companies = list_companies_with_history()
     return {
         "incident_rates": incident_rate_by_kind_and_tier(),
         "approval_turnaround": approval_turnaround(),
-        "companies_tracked": list_companies_with_history(),
+        "companies_tracked": companies,
+        "schema_compliance": [schema_compliance_rate(cid) for cid in companies],
+        "approval_quality_flags": approval_quality_flags(),
+        "security_scan_summary": security_scan_summary(),
+        "unexpected_tool_calls": {
+            agent: calls for agent in EXPECTED_TOOLS
+            if (calls := unexpected_tool_calls(agent))
+        },
     }

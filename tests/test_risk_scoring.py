@@ -82,6 +82,119 @@ def test_company_agent_regression_high_critical_routes_to_pending_human_approval
         assert finding.routing == "pending_human_approval"
 
 
+def test_cost_anomaly_no_baseline_no_finding():
+    assert risk_scoring.check_cost_anomaly(50.0, None) is None
+    assert risk_scoring.check_cost_anomaly(50.0, 0) is None
+
+
+def test_cost_anomaly_under_threshold_no_finding():
+    assert risk_scoring.check_cost_anomaly(12.0, 10.0) is None  # 20% over, under the 50% floor
+
+
+def test_cost_anomaly_medium_at_50_pct_over():
+    finding = risk_scoring.check_cost_anomaly(15.0, 10.0)
+    assert finding is not None
+    assert finding.risk_tier == "medium"
+    assert finding.routing == "human_review"
+
+
+def test_cost_anomaly_high_at_100_pct_over():
+    finding = risk_scoring.check_cost_anomaly(20.0, 10.0)
+    assert finding.risk_tier == "high"
+
+
+def test_context_pressure_truncated_is_always_high():
+    finding = risk_scoring.check_context_pressure(70.0, truncated=True)
+    assert finding is not None
+    assert finding.risk_tier == "high"
+
+
+def test_context_pressure_near_limit_not_truncated_is_medium():
+    finding = risk_scoring.check_context_pressure(93.0, truncated=False)
+    assert finding is not None
+    assert finding.risk_tier == "medium"
+
+
+def test_context_pressure_comfortable_no_finding():
+    assert risk_scoring.check_context_pressure(60.0, truncated=False) is None
+
+
+def test_user_escalation_spike_thresholds():
+    thresholds = {"warning_at_or_above": 8.0, "breach_at_or_above": 15.0}
+    assert risk_scoring.check_user_escalation_spike(5.0, thresholds) is None
+    warn = risk_scoring.check_user_escalation_spike(9.0, thresholds)
+    assert warn.risk_tier == "medium"
+    breach = risk_scoring.check_user_escalation_spike(20.0, thresholds)
+    assert breach.risk_tier == "high"
+
+
+def test_pii_exposure_no_matches_no_finding():
+    assert risk_scoring.check_pii_exposure([]) is None
+
+
+def test_pii_exposure_any_match_is_critical():
+    finding = risk_scoring.check_pii_exposure(["email"])
+    assert finding is not None
+    assert finding.risk_tier == "critical"
+    assert finding.routing == "human_review"
+
+
+def test_prompt_injection_requires_both_marker_and_success():
+    assert risk_scoring.check_prompt_injection([], succeeded=True) is None
+    assert risk_scoring.check_prompt_injection(["ignore previous instructions"], succeeded=False) is None
+
+
+def test_prompt_injection_succeeded_is_critical():
+    finding = risk_scoring.check_prompt_injection(["ignore previous instructions"], succeeded=True)
+    assert finding is not None
+    assert finding.kind == "prompt_injection_succeeded"
+    assert finding.risk_tier == "critical"
+
+
+def test_agent_loop_below_threshold_no_finding():
+    assert risk_scoring.check_agent_loop(3, threshold=5) is None
+
+
+def test_agent_loop_medium_routes_to_auto_rollback():
+    finding = risk_scoring.check_agent_loop(6, threshold=5)
+    assert finding is not None
+    assert finding.risk_tier == "medium"
+    assert finding.routing == "auto_rollback"
+
+
+def test_agent_loop_high_routes_to_pending_human_approval():
+    finding = risk_scoring.check_agent_loop(11, threshold=5)
+    assert finding.risk_tier == "high"
+    assert finding.routing == "pending_human_approval"
+
+
+def test_canary_no_divergence_no_finding():
+    assert risk_scoring.check_canary_divergence(False) is None
+
+
+def test_canary_divergence_is_high_and_pending_approval():
+    finding = risk_scoring.check_canary_divergence(True)
+    assert finding is not None
+    assert finding.risk_tier == "high"
+    assert finding.routing == "pending_human_approval"
+
+
+def test_groundedness_grounded_no_finding():
+    assert risk_scoring.check_groundedness("grounded") is None
+
+
+def test_groundedness_unsupported_is_medium():
+    finding = risk_scoring.check_groundedness("unsupported")
+    assert finding is not None
+    assert finding.risk_tier == "medium"
+    assert finding.routing == "human_review"
+
+
+def test_groundedness_fabricated_is_critical():
+    finding = risk_scoring.check_groundedness("fabricated")
+    assert finding.risk_tier == "critical"
+
+
 def test_assess_cycle_returns_all_firing_findings_together():
     findings = risk_scoring.assess_cycle(
         flagged_company_ids=["a", "b"], portfolio_size=3,

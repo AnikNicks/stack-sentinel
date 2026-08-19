@@ -18,9 +18,48 @@
   "status": "auto_resolved",
   "remediation_detail": "intake-triage-agent (meridian) flagged low-risk \u2014 reverting to its last known-good version automatically, no human gate required. A routine prompt-template deploy to intake-triage-agent (v2) began occasionally mis-tagging low-priority tickets as 'shipping' instead of 'billing', delaying routing by a few minutes with no customer-facing impact.",
   "resolved_by": "pulse-auto-rollback",
-  "human_note": "Auto-rolled back meridian/intake-triage-agent to v1.",
+  "human_note": "Auto-rolled back meridian/intake-triage-agent.",
   "counterfactual": null,
+  "policy_check": {
+    "meridian": {
+      "matched_clause_titles": [
+        "Internal agent regression handling"
+      ],
+      "company_clauses": [
+        {
+          "title": "Internal agent regression handling",
+          "text": "## Internal agent regression handling\n\nAny Meridian-internal agent (intake-triage-agent, resolution-agent, escalation-agent) flagged\nlow or medium risk is auto-rolled-back to its last known-good version with no human in the\nloop \u2014 the same reasoning as an auto-rollback of Stack Sentinel's own classifiers: the prior\nversion was already live and known-good. Any Meridian-internal agent flagged high or critical\nrisk must never be rolled back automatically; an explicit, logged human decision is required\nfirst. A misrouted support ticket is a low-risk event; anything touching the refund-approval\nor shipping-address boundaries directly is never low-risk, regardless of dollar amount. This\napplies equally to a detected hand-off loop between two Meridian agents (e.g.\nescalation-agent and resolution-agent repeatedly bouncing the same ticket): the same\nrisk-tiered auto-rollback-or-human-decision split governs it.",
+          "distance": 0.6232113838195801
+        }
+      ],
+      "shared_clauses": [
+        {
+          "title": "Agent hand-off loops",
+          "text": "## Agent hand-off loops\n\nA monitored agent stuck repeatedly handing a task back and forth with another agent, well\nbeyond what a single legitimate escalation would require, is treated with the same\nrisk-tiered discipline as any other internal-agent regression: a bounded loop is reverted\nautomatically to the agent's last known-good version, the same reasoning as any other\nlow/medium-risk auto-rollback (the prior version was not looping); a loop severe enough to\ncross into high or critical risk is never auto-executed and is held for an explicit human\ndecision instead.",
+          "distance": 1.1423203945159912
+        }
+      ],
+      "contributing_assessments": [
+        {
+          "agent": "goal-drift-tracker",
+          "version": "v1",
+          "raw_classification": "on_charter",
+          "rationale": "No behavior_incidents this cycle; system operating within its charter boundaries."
+        },
+        {
+          "agent": "change-impact-synthesizer",
+          "version": "v2",
+          "model": "claude-sonnet-4-20250514",
+          "read": "noise",
+          "rationale": "No layer change_event this cycle plausibly bears on the finding; nothing to attribute."
+        }
+      ],
+      "checked": true,
+      "compliant": true,
+      "rationale": "intake-triage-agent's mis-tagging is a misrouted-ticket event \u2014 explicitly named low-risk by Meridian's own policy, which never touches the refund-approval or shipping-address boundaries. Auto-rollback with no human gate is exactly what the clause requires for a low-risk internal-agent event."
+    }
+  },
   "escalation_log": [],
-  "created_at": "2026-08-18T15:14:36.452335+00:00",
-  "reviewed_at": "2026-08-18T15:14:36.463964+00:00"
+  "created_at": "2026-08-19T09:07:27.067465+00:00",
+  "reviewed_at": "2026-08-19T09:07:27.088584+00:00"
 }

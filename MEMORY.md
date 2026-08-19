@@ -12,9 +12,13 @@ metrics plus the bounded recent window described in each agent's retrieval scope
 cycles for `goal-drift-tracker`/`slo-risk-tracker`/`change-impact-synthesizer`; exactly the
 two entries bracketing a boundary for `model-boundary-interpreter`; the latest entry per
 company for `portfolio-rollup-writer`; no trend data at all for
-`policy-compliance-checker`). Assembled fresh by `pulse/orchestrator.py` for every
-invocation, discarded after — an agent never carries state between invocations. See
-`.claude/agents/*.md` for each agent's exact retrieval-scope comment.
+`policy-compliance-checker`, which instead gets one company-scoped and one shared policy
+search per incident). `groundedness-checker` is the narrowest case of all: no tool calls
+whatsoever — just the two excerpts (generated output, retrieved source) pushed to it directly,
+nothing else fetched because nothing else bears on the one question it answers. Assembled
+fresh by `pulse/orchestrator.py` for every invocation, discarded after — an agent never
+carries state between invocations. See `.claude/agents/*.md` for each agent's exact
+retrieval-scope comment.
 
 ## Episodic memory
 
@@ -40,10 +44,12 @@ that fixed charter.
 
 There is no learned-pattern store anywhere in this system that any agent writes to or reads
 from. No "the system has learned that X usually means Y" mechanism exists. This is a
-deliberate omission, not a gap: `pulse/risk_scoring.py`'s four deterministic rules
-(systemic-flag-spike, model-boundary ambiguity, policy violation, destructive layer change)
-serve the role a procedural-memory system might otherwise fill — **encoded, inspectable rules
-instead of learned, opaque ones.** If asked directly why: a procedural-memory system that
+deliberate omission, not a gap: `pulse/risk_scoring.py`'s twelve deterministic rules —
+the original four (systemic-flag-spike, model-boundary ambiguity, policy violation,
+destructive layer change) plus the eight added for extended monitoring (cost anomaly, context
+pressure, user-escalation spike, PII exposure, prompt-injection success, agent hand-off loops,
+canary divergence, groundedness failure) — serve the role a procedural-memory system might
+otherwise fill — **encoded, inspectable rules instead of learned, opaque ones.** If asked directly why: a procedural-memory system that
 quietly reweights its own risk thresholds based on outcomes is exactly the kind of drift this
 whole project exists to prevent — an escalation rule that changed itself last cycle for
 reasons nobody wrote down is indistinguishable, eighteen months later, from the model-boundary

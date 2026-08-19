@@ -1,9 +1,19 @@
 {
-  "rollback_incident_id": "INC-0004",
-  "boundary_incident_id": "INC-0006",
-  "destructive_incident_id": "INC-0005",
+  "rollback_incident_id": "INC-0007",
+  "boundary_incident_id": "INC-0013",
+  "destructive_incident_id": "INC-0011",
   "rrb_dispatch_cycle": "2025-S07",
   "company_agent_auto_rollback_incident_id": "INC-0002",
-  "company_agent_pending_approval_incident_id": "INC-0003",
+  "company_agent_pending_approval_incident_id": "INC-0005",
+  "canary_divergence_incident_id": "INC-0004",
+  "agent_loop_pending_approval_incident_id": "INC-0010",
+  "extended_monitoring_review_incident_ids": [
+    "INC-0003",
+    "INC-0006",
+    "INC-0008",
+    "INC-0009",
+    "INC-0012",
+    "INC-0014"
+  ],
   "live_mode": false
 }

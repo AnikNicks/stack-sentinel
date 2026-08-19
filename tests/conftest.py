@@ -49,3 +49,13 @@ def isolated_audit_log(tmp_path, monkeypatch):
     monkeypatch.setattr(audit_log, "AUDIT_LOG_PATH", tmp_path / "audit_log.jsonl")
     monkeypatch.setattr(audit_log, "ensure_data_dirs", lambda: None)
     return audit_log
+
+
+@pytest.fixture
+def isolated_notifications(tmp_path, monkeypatch):
+    """Any test that drives orchestrator.run_portfolio_cycle far enough to create a real
+    incident also triggers a real notifications.dispatch_for_incident call — without this,
+    that write lands in the real repo-root notifications_log.jsonl, not a test fixture."""
+    from pulse import notifications
+    monkeypatch.setattr(notifications, "NOTIFICATIONS_LOG_PATH", tmp_path / "notifications_log.jsonl")
+    return notifications

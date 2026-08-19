@@ -162,6 +162,37 @@ code {
   line-height: 1.55;
 }
 
+/* KPI strip --------------------------------------------------------------- */
+
+.kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.kpi-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: var(--shadow);
+}
+
+.kpi-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.kpi-label {
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
 /* Overview cards ------------------------------------------------------------ */
 
 .card-grid {
@@ -185,6 +216,20 @@ code {
 .company-card:hover {
   border-color: var(--accent);
   transform: translateY(-1px);
+}
+
+.company-card-clickable {
+  cursor: pointer;
+}
+
+.company-card-clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.company-card-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow);
 }
 
 .company-card h3 {
@@ -257,6 +302,40 @@ code {
   gap: 32px;
 }
 
+/* Company dropdown selector ------------------------------------------------ */
+
+.company-select-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.company-select-label {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-2);
+  font-weight: 700;
+}
+
+.company-select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  min-width: 260px;
+  cursor: pointer;
+}
+
+.company-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .company-block {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -279,16 +358,28 @@ code {
   font-weight: 650;
 }
 
+.subhead-block {
+  margin: 26px 0 8px;
+}
+
+.subhead-block-first {
+  margin-top: 16px;
+}
+
 .company-subhead {
-  margin: 20px 0 8px;
+  margin: 0;
   font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted-2);
 }
 
-.company-block > .company-subhead:first-of-type {
-  margin-top: 16px;
+.subhead-purpose {
+  margin: 3px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.5;
+  max-width: 640px;
 }
 
 .charter-panel { font-size: 0.88rem; }
@@ -307,6 +398,16 @@ code {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
+  cursor: pointer;
+}
+
+.agent-card:hover {
+  border-color: var(--accent);
+}
+
+.agent-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .agent-card-rolled-back {
@@ -318,19 +419,25 @@ code {
 .agent-card-version { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
 .agent-card-flag { font-size: 0.76rem; color: var(--warn); font-weight: 650; margin-top: 4px; }
 
-.policy-details {
-  margin-top: 20px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-2);
+.policy-summary {
+  font-size: 0.87rem;
 }
 
-.policy-details summary {
-  cursor: pointer;
-  padding: 10px 14px;
-  font-size: 0.85rem;
-  font-weight: 650;
-  color: var(--text);
+.clause-list {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  color: var(--muted);
+}
+
+.clause-list li {
+  margin-bottom: 3px;
+  line-height: 1.5;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  margin-right: 0;
 }
 
 .policy-text {
@@ -343,6 +450,11 @@ code {
   color: var(--muted);
   max-height: 360px;
   overflow-y: auto;
+}
+
+.policy-text-full {
+  padding: 0;
+  max-height: 60vh;
 }
 
 .mini-incidents {
@@ -366,6 +478,28 @@ code {
   border-radius: 20px;
   font-size: 0.78rem;
   font-weight: 600;
+  border: none;
+  margin: 0;
+  cursor: pointer;
+}
+
+.mini-incident-chip:hover {
+  filter: brightness(1.15);
+}
+
+.mini-incidents-viewall {
+  background: none;
+  color: var(--accent);
+  border: none;
+  padding: 3px 4px;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.mini-incidents-viewall:hover {
+  text-decoration: underline;
 }
 
 /* Tables --------------------------------------------------------------- */
@@ -418,9 +552,13 @@ tbody tr:hover {
 }
 
 .rationale-cell {
-  max-width: 420px;
+  max-width: 360px;
   color: var(--muted);
   line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: help;
 }
 
 .risk {
@@ -544,6 +682,46 @@ button:disabled {
   background: var(--accent-soft);
 }
 
+/* Registry pill row (System section) -------------------------------------- */
+
+.registry-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.registry-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.registry-pill:hover {
+  border-color: var(--accent);
+}
+
+.registry-pill-name {
+  color: var(--text);
+}
+
+.registry-pill-version {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 /* System health --------------------------------------------------------- */
 
 .health-grid {
@@ -574,6 +752,18 @@ button:disabled {
   margin-top: 18px;
 }
 
+.rollup-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 pre {
   background: var(--surface-2);
   padding: 12px 14px;
@@ -596,6 +786,19 @@ textarea {
   font-family: inherit;
   font-size: 0.92rem;
   resize: vertical;
+}
+
+.ask-cached-badge {
+  display: inline-block;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 10px;
 }
 
 .ask-answer {
@@ -685,6 +888,20 @@ textarea {
   font-size: 0.72rem;
   color: var(--muted-2);
   margin-top: 2px;
+}
+
+.mini-trend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.mini-trend-label {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  color: var(--muted-2);
+  text-align: center;
 }
 
 .chart-empty {
@@ -906,6 +1123,19 @@ textarea {
 
 .bad-text {
   color: var(--bad);
+}
+
+.ok-text {
+  color: var(--ok);
+  font-weight: 650;
+}
+
+.detail-list-clickable {
+  cursor: pointer;
+}
+
+.detail-list-clickable:hover {
+  background: var(--surface);
 }
 
 @media (max-width: 720px) {

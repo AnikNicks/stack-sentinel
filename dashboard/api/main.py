@@ -233,12 +233,23 @@ def _build_snapshot() -> dict[str, Any]:
     }
 
 
+# In-memory answer cache, so re-asking the same question doesn't re-call the LLM every time.
+# Keyed on (redacted question, hash of the current real snapshot) — never on question alone —
+# so a stale answer can never be served once the underlying data actually changes (a fresh
+# simulate_production_run.py --reset run, or any incident decision made through the dashboard,
+# naturally busts every cache entry for free, no manual invalidation needed). Local-only, like
+# the rest of this app: resets on process restart, no persistence, no cross-user sharing.
+_ASK_CACHE: dict[str, dict[str, Any]] = {}
+_ASK_CACHE_MAX_ENTRIES = 200
+
+
 @app.post("/ask")
 def ask(body: AskRequest) -> dict[str, Any]:
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise HTTPException(503, "OPENAI_API_KEY is not set on the console API process — Ask is not configured.")
 
+    import hashlib
     import json
 
     import requests
@@ -247,6 +258,14 @@ def ask(body: AskRequest) -> dict[str, Any]:
     if not question:
         raise HTTPException(400, "empty question")
 
+    snapshot_json = json.dumps(_build_snapshot(), sort_keys=True)
+    snapshot_hash = hashlib.sha256(snapshot_json.encode("utf-8")).hexdigest()[:16]
+    cache_key = hashlib.sha256(f"{question}|{snapshot_hash}".encode("utf-8")).hexdigest()
+
+    cached = _ASK_CACHE.get(cache_key)
+    if cached is not None:
+        return {**cached, "cached": True}
+
     model = os.environ.get("PULSE_OPENAI_MODEL", "gpt-4o-mini")
     payload = {
         "model": model,
@@ -254,7 +273,7 @@ def ask(body: AskRequest) -> dict[str, Any]:
         "max_tokens": int(os.environ.get("PULSE_OPENAI_MAX_TOKENS", "1600")),
         "messages": [
             {"role": "system", "content": _ASK_SYSTEM_PROMPT},
-            {"role": "user", "content": "DATA (this run's real monitoring data, JSON):\n" + json.dumps(_build_snapshot())},
+            {"role": "user", "content": "DATA (this run's real monitoring data, JSON):\n" + snapshot_json},
             {"role": "user", "content": "QUESTION: " + question},
         ],
     }
@@ -269,7 +288,12 @@ def ask(body: AskRequest) -> dict[str, Any]:
     answer = _redact_pii(choice["message"]["content"])
     if choice.get("finish_reason") == "length":
         answer += "\n\n[Response cut off at the token cap — ask a narrower question.]"
-    return {"answer": answer, "model": model}
+
+    result = {"answer": answer, "model": model}
+    if len(_ASK_CACHE) >= _ASK_CACHE_MAX_ENTRIES:
+        _ASK_CACHE.pop(next(iter(_ASK_CACHE)))  # evict oldest entry, dict preserves insertion order
+    _ASK_CACHE[cache_key] = result
+    return {**result, "cached": False}
 
 
 if __name__ == "__main__":

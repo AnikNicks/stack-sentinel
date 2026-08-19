@@ -41,4 +41,5 @@ export const AGENTS = [
   "model-boundary-interpreter",
   "portfolio-rollup-writer",
   "policy-compliance-checker",
+  "groundedness-checker",
 ];

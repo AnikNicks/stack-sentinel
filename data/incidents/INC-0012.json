@@ -1,0 +1,64 @@
+{
+  "incident_id": "INC-0012",
+  "detected_at": "2025-04-22",
+  "kind": "user_escalation_spike",
+  "company_ids": [
+    "meridian"
+  ],
+  "agent_version": "v2",
+  "model": "claude-sonnet-4-20250514",
+  "input_snapshot": {
+    "company_id": "meridian",
+    "rate_pct": 18.5
+  },
+  "output_snapshot": {},
+  "risk_tier": "high",
+  "routing": "human_review",
+  "status": "reviewed",
+  "remediation_detail": "User-escalation rate at 18.5% (warning>=8.0, breach>=15.0) \u2014 users themselves are routing around the agent at an elevated rate.",
+  "resolved_by": "priya.nair@platform-reliability.example.com",
+  "human_note": "Reviewed \u2014 see the incident's own remediation_detail and policy_check for the full record.",
+  "counterfactual": null,
+  "policy_check": {
+    "meridian": {
+      "matched_clause_titles": [
+        "User-escalation rate"
+      ],
+      "company_clauses": [
+        {
+          "title": "User-escalation rate",
+          "text": "## User-escalation rate\n\nA sustained rise in the rate of tickets Meridian's own customers escalate directly to a human\nagent \u2014 bypassing the concierge flow rather than any single flagged incident \u2014 is itself a\nsignal worth human review, independent of whatever the charter-boundary classification says\nthat cycle.",
+          "distance": 0.7422962784767151
+        }
+      ],
+      "shared_clauses": [
+        {
+          "title": "Layer-level change reporting",
+          "text": "## Layer-level change reporting\n\nSLO classifications are computed deterministically from SLO-agreement thresholds and reported\noperational metrics (see `pulse/policy_rules.py`). The following reporting obligation is\nindependent of whether the trend is improving or worsening in any given cycle:\n\nAny SLO classified as warning for two or more consecutive reporting periods must be reported\nto the Reliability Review Board at the next scheduled meeting, regardless of trend direction.\nA single warning cycle does not trigger this clause; two or more consecutive warning cycles\ndoes, even if the second cycle shows improvement over the first, because the obligation is\nabout sustained proximity to breach, not about the direction of travel.",
+          "distance": 1.198035478591919
+        }
+      ],
+      "contributing_assessments": [
+        {
+          "agent": "goal-drift-tracker",
+          "version": "v1",
+          "raw_classification": "on_charter",
+          "rationale": "No behavior_incidents this cycle; system operating within its charter boundaries."
+        },
+        {
+          "agent": "change-impact-synthesizer",
+          "version": "v2",
+          "model": "claude-sonnet-4-20250514",
+          "read": "noise",
+          "rationale": "No layer change_event this cycle plausibly bears on the finding; nothing to attribute."
+        }
+      ],
+      "checked": true,
+      "compliant": true,
+      "rationale": "A sustained rise in tickets escalated directly to a human is exactly the independent signal Meridian's own policy names, regardless of the charter classification that cycle."
+    }
+  },
+  "escalation_log": [],
+  "created_at": "2026-08-19T09:07:32.179288+00:00",
+  "reviewed_at": "2026-08-19T09:07:33.470537+00:00"
+}

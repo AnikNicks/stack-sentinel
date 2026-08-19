@@ -50,6 +50,18 @@ def test_record_approval_decision_rejected(isolated_incidents):
     assert updated["status"] == "rejected"
 
 
+def test_attach_policy_check_updates_and_persists(isolated_incidents):
+    bundle = _create(isolated_incidents, "pending_human_approval")
+    assert bundle["policy_check"] is None
+
+    check = {"cascade": {"checked": True, "compliant": True, "matched_clause_titles": ["x"], "rationale": "y"}}
+    updated = isolated_incidents.attach_policy_check(bundle["incident_id"], check)
+    assert updated["policy_check"] == check
+
+    reloaded = isolated_incidents.get_incident(bundle["incident_id"])
+    assert reloaded["policy_check"] == check
+
+
 def test_record_approval_decision_does_not_itself_perform_any_action(isolated_incidents):
     """record_approval_decision only ever writes status/resolved_by/human_note/reviewed_at —
     it has no side effect beyond the incident bundle itself (no call to any layer, no

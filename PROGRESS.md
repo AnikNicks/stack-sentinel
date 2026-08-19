@@ -6,14 +6,16 @@ file alone and know what's built, what's tested, what's left, and where.
 
 ## Status
 
-**Build complete, local-only.** All 6 phases of the domain pivot done, all real, all
-verified for real, against the actual repo — not narrated. This project started as
-`portfolio-pulse`, a PE/private-debt financial monitoring demo; this build is a full domain
-pivot to multi-agent AI software monitoring, seeded by copying that repo's files (never
-modifying the original — it's a separate, already-published project) into this one and
-transforming them. `--live` notification delivery, a GitHub remote/Pages republish, and a
-literal separate git repo per company are all explicitly deferred, later, user-approved steps
-— none of them have happened in this build.
+**Build complete, local-only, through three real build waves.** The original 6-phase domain
+pivot, a follow-on company-agent-versioning + risk-tiered-rollback subsystem (with a
+company-wise dashboard reorg), and a Phase 7 extended-monitoring build (8 new deterministic
+finding kinds + 1 new agent) are all real, all verified for real, against the actual repo —
+not narrated. This project started as `portfolio-pulse`, a PE/private-debt financial
+monitoring demo; this build is a full domain pivot to multi-agent AI software monitoring,
+seeded by copying that repo's files (never modifying the original — it's a separate,
+already-published project) into this one and transforming them. `--live` notification
+delivery, a GitHub remote/Pages republish, and a literal separate git repo per company are all
+explicitly deferred, later, user-approved steps — none of them have happened in this build.
 
 ## Done
 
@@ -51,8 +53,11 @@ literal separate git repo per company are all explicitly deferred, later, user-a
   benign on investigation) rather than a soft `watch` — the incident text in
   `data/layer_metrics/{meridian,wayfinder}.json` was rewritten to make that raw read honestly
   defensible, matching what a real, non-buggy `goal-drift-tracker` would produce from that
-  data. `--reset` run produces exactly the 4 expected incidents with correct routing;
-  `investigate_incident.py`/`reproducibility_check.py` verified against the real `INC-0002`.
+  data. `--reset` run produced exactly the 4 expected incidents with correct routing at this
+  point in the build; `investigate_incident.py`/`reproducibility_check.py` verified against
+  the real systemic-flag-spike incident (at the time, `INC-0002` — incident numbering has
+  since shifted twice, see the company-agent-rollback and Phase 7 entries below; current
+  numbering is in `PRODUCTION_READINESS_REPORT.md`).
 - **Phase 4 — docs (partial, finished after Phase 5/6):** `CLAUDE.md`, `MEMORY.md`,
   `VERSIONING.md` fully rewritten; new `SECURITY.md` (agentic-tool risk-class audit, one
   file:function citation per claim). Found and fixed leftover "quarter" wording in
@@ -74,12 +79,75 @@ literal separate git repo per company are all explicitly deferred, later, user-a
   surface dramatizing that company's real charter boundary/SLO and a "Cycle Replay" tab over
   the real 10-cycle fixture. All three `npm run build` clean; Cascade's app verified live in a
   browser on both tabs.
+- **Company-agent versioning + risk-tiered rollback (follow-on wave):** the user corrected the
+  original build's scope — the auto-rollback/version-registry machinery needed to apply to
+  each monitored *company's own* internal agents, not to Stack Sentinel's own six classifiers.
+  New `pulse/company_registry.py` (mirrors `pulse/registry.py`, keyed by `(company_id, agent)`)
+  + `pulse/company_rollback.py` (mirrors `pulse/soft_fix.py`) + new
+  `risk_scoring.check_company_agent_regression` (low/medium → auto-rollback, high/critical →
+  `pending_human_approval`, the exact reasoning `soft_fix.py` already established, reapplied to
+  a different subject). New per-company policy documents (`policy/companies/*.md`) and
+  `pulse/vector_store.py` gained a per-company chromadb collection
+  (`ingest_company_policy_corpus`/`search_company_policy`) alongside the shared corpus. **Real
+  bug found and fixed:** `company_rollback.auto_rollback_company_agent` originally had no way
+  to distinguish a fully-automatic rollback from a human-approved one — both stamped
+  `activated_by: pulse-auto-rollback`, misleading the audit trail; fixed by adding an explicit
+  `activated_by` parameter. **Real design gap found and fixed:** `POST
+  /incidents/{id}/decision` originally only ever recorded a decision and never acted, even for
+  the new, genuinely-reversible company-agent-rollback case; fixed with a narrow conditional
+  branch that executes the rollback only for an approved `company_agent_regression` incident,
+  preserving `human_approval.py`'s never-acts contract for every other (destructive) kind.
+  Dashboard reorganized company-wise (System → Ask → Companies dropdown → Incidents, each
+  company's own agents/policy/charter shown together) per explicit user direction.
+- **`policy-compliance-checker` wired into the orchestrator for real (follow-on wave):** the
+  agent existed as a spec-correct `.claude/agents/*.md` file and a benchmark suite from Phase 2
+  but was never actually invoked against a real incident. `pulse/orchestrator.py` gained
+  `_check_policy_compliance`/`_apply_policy_check` (later folded into `_route_finding`, see
+  Phase 7 below): every incident is now checked, per company named on it, against that
+  company's own policy document AND the shared corpus (two real chromadb searches), with the
+  contributing agents' real input/output attached — not just the bare classification label.
+  A non-compliant read creates a separate `policy_violation` incident routed to
+  `human_review`, never silently correcting the original routing.
+- **Phase 7 — extended monitoring dimensions:** the user asked what else a real AI-software
+  monitor would need, then asked for all of it, wired into the real simulation. 8 new
+  deterministic finding kinds (cost anomaly, context-window pressure, user-escalation spike,
+  PII exposure, prompt-injection success, agent hand-off loops, canary/version divergence, and
+  groundedness — the one genuine semantic judgment, routed through one new agent,
+  `groundedness-checker`, the system's 7th) backed by 4 new real deterministic modules
+  (`pulse/pii_scan.py`, `injection_monitoring.py`, `agent_loop_detection.py`,
+  `canary_comparison.py`) plus `risk_scoring.py` growing from 4 to 12 finding kinds. The
+  incident-creation loop in `run_portfolio_cycle` was refactored into one shared
+  `_route_finding` helper (create → auto-remediate-or-gate → dispatch → policy-check) so all
+  12 kinds go through the identical lifecycle instead of 8 more near-duplicate blocks. New
+  `pulse/metrics.py` rollups (`schema_compliance_rate`, `unexpected_tool_calls`,
+  `approval_quality_flags`, `security_scan_summary`) surfaced in a new dashboard panel. All 30
+  real cycles across the 3 companies gained cost/context/escalation fields and 6 real narrative
+  `security_quality_events`, each firing its detector for real against realistic scripted
+  input, never a pre-baked verdict. **Real bug found and fixed during live verification:**
+  `CompanyCharterPanel` crashed switching to the one SLO-tracked company (Cascade) — a
+  one-render race where stale charter-shaped data was read against an already-flipped
+  `monitoring_track` flag; fixed by branching on the fetched data's actual shape (plus a
+  remount key) instead of the flag alone. **Real test-hygiene bug found and fixed:** none of
+  the tests driving `run_portfolio_cycle` to a real incident isolated `notifications_log.jsonl`
+  — every test run was silently leaking synthetic `policy_violation` dispatch records into the
+  real repo-root log; fixed with a new `isolated_notifications` fixture/context-manager in both
+  `tests/conftest.py` and `tests/run_tests.py`, wired into all 7 affected tests, and the leaked
+  entries were purged by a fresh `--reset` run.
+- **Dashboard follow-ups (same waves):** Ask responses are now cached in-memory
+  (`dashboard/api/main.py`'s `_ASK_CACHE`, keyed on question + a hash of the current real data
+  snapshot, so a repeat question never re-calls the LLM but a cache entry can never outlive the
+  data it was grounded in) with a "served from cache" badge in the UI; clicking any company
+  (a System card or the Companies dropdown) now drives one shared selection that scopes both
+  the Companies detail AND the Incidents table to that company, with a company filter dropdown
+  added to Incidents directly; every System-section visualization gained a purpose-caption
+  subheading, matching the section-level description pattern.
 
 ## In progress
 
-Nothing — the 6-phase build is complete. Remaining work is entirely the explicitly-deferred,
-later, user-approved steps: `--live` notification credentials, GitHub remote + Pages
-republish, and (if actually wanted, not yet confirmed) literal separate git repos per company.
+Nothing — all work requested so far is complete and verified. Remaining work is entirely the
+explicitly-deferred, later, user-approved steps: `--live` notification credentials, GitHub
+remote + Pages republish, and (if actually wanted, not yet confirmed) literal separate git
+repos per company.
 
 ## Key decisions
 
@@ -102,23 +170,42 @@ republish, and (if actually wanted, not yet confirmed) literal separate git repo
   `watch`) — matching the original project's design of counting only the worst per-track
   state. This meant the S06/S09 incident narratives needed a raw `drifted` read that's
   honestly defensible on its face (see Phase 3 above), not a softer `watch`.
+- **Only one of the 8 extended-monitoring dimensions got a new agent.** When asked for "all"
+  of a 10-item monitoring-dimension brainstorm, the deterministic/agentic boundary was applied
+  strictly rather than defaulting to more LLM calls: cost, context-pressure, PII, injection,
+  agent-loops, and canary-divergence are all real literal/countable facts (regex matches,
+  repeat counts, categorical (in)equality, threshold comparisons) — zero LLM. Groundedness
+  ("does this output's claim actually match its source") is the one case that is a genuine
+  semantic judgment no regex or threshold could substitute for, which is why `groundedness-
+  checker` is the system's 7th agent and the only new one.
 
 ## Verification status
 
-- `pytest tests/ -v`: **57 passed, 0 failed**.
-- `python tests/run_tests.py`: **31 passed, 0 failed**.
-- `python scripts/simulate_production_run.py --reset`: runs clean, produces exactly 4
-  incidents (`INC-0001` fault-injection drill, `INC-0002` systemic-flag-spike/auto-rollback,
-  `INC-0003` destructive-change/approved, `INC-0004` model-boundary/reviewed) with correct
-  routing every time — re-run twice during this build, identical result both times.
+Current, after all three build waves (see `PRODUCTION_READINESS_REPORT.md` for the full
+real-numbers report this section summarizes):
+
+- `pytest tests/ -v`: **127 passed, 0 failed**.
+- `python tests/run_tests.py`: **57 passed, 0 failed**.
+- `python scripts/simulate_production_run.py --reset`: runs clean, produces exactly 14
+  incidents across 12 kinds with correct routing every time — the original 4 kinds
+  (`INC-0007` systemic-flag-spike/auto-rollback, `INC-0011` destructive-change/approved,
+  `INC-0013` model-boundary/reviewed, `INC-0001` the fault-injection drill's own
+  model-boundary) plus 8 extended-monitoring kinds (`INC-0002`/`INC-0005`
+  company-agent-regression, `INC-0003` context-pressure, `INC-0004` canary-divergence,
+  `INC-0006` PII-exposure, `INC-0008` prompt-injection-succeeded, `INC-0009` cost-anomaly,
+  `INC-0010` agent-loop-detected, `INC-0012` user-escalation-spike, `INC-0014`
+  groundedness-failure) — re-run repeatedly during this build, identical result every time.
 - `scripts/investigate_incident.py` / `scripts/reproducibility_check.py`: both run clean
-  against the real `INC-0002`.
+  against the real `INC-0007` (current systemic-flag-spike incident).
 - `dashboard/api` + `dashboard/web`: verified live in a real Chrome browser (via the
-  `claude-in-chrome` tooling) against real backend data — all 6 pages, including a real
-  `POST /incidents/{id}/decision` call (data restored via `git checkout` afterward, since
-  that call was a manual verification step, not part of the actual simulation run).
+  `claude-in-chrome` tooling) against real backend data — all 4 current top-level sections
+  (System, Ask, Companies, Incidents), including a real `POST /incidents/{id}/decision` call
+  and a real `POST /ask` cache-hit/cache-miss pair. Real data was restored via a fresh
+  `--reset` run afterward each time, since these were manual verification steps, not part of
+  the actual simulation run.
 - `companies/cascade-analytics`: verified live in a real browser, both the Product and Cycle
   Replay tabs, against the real fixture data.
 - `companies/meridian-labs`, `companies/wayfinder-ai`: `npm run build` verified clean; not
   separately browser-verified (Cascade's verification exercised the shared component pattern
-  all three apps use).
+  all three apps use). All three apps' fixtures regenerated after Phase 7 and confirmed to
+  carry the new cost/context/escalation/`security_quality_events` fields.

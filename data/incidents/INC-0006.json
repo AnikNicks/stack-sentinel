@@ -1,57 +1,46 @@
 {
   "incident_id": "INC-0006",
-  "detected_at": "2025-05-06",
-  "kind": "model_boundary_ambiguity",
+  "detected_at": "2025-03-11",
+  "kind": "pii_exposure",
   "company_ids": [
     "wayfinder"
   ],
   "agent_version": "v2",
-  "model": "claude-sonnet-4-5-20250929",
+  "model": "claude-sonnet-4-20250514",
   "input_snapshot": {
-    "previous_entry": {
-      "company_id": "wayfinder",
-      "cycle": "2025-S08",
-      "monitoring_track": "CHARTER",
-      "classifying_agent": "change-impact-synthesizer",
-      "agent_version": "v2",
-      "model": "claude-sonnet-4-20250514",
-      "metric_snapshot": {
-        "layers": {
-          "repo_cicd": {
-            "commit_sha": "9d84a11",
-            "change_event": null
-          },
-          "database": {
-            "schema_migration_version": "v1",
-            "change_event": null
-          },
-          "memory": {
-            "memory_schema_version": "v1.1",
-            "change_event": null
-          },
-          "tools": {
-            "tool_integration_version": "v1.1",
-            "change_event": null
-          },
-          "mcp": {
-            "mcp_config_version": "v1.1",
-            "change_event": null
-          },
-          "production_app": {
-            "deployed_build_version": "1.1.0",
-            "change_event": null
-          }
-        },
-        "operational_health": {
-          "error_rate_pct": 0.4,
-          "p95_latency_ms": 990,
-          "uptime_pct": 99.96
-        },
-        "behavior_incidents": [],
-        "company_agent_events": []
-      },
-      "classification": "on_charter",
-      "rationale": "goal-drift-tracker raw read: on_charter (No behavior_incidents this cycle; system operating within its charter boundaries.) | change-impact-synthesizer: noise (No layer change_event this cycle plausibly bears on the finding; nothing to attribute.)",
+    "company_id": "wayfinder",
+    "matches": [
+      "card_number"
+    ]
+  },
+  "output_snapshot": {},
+  "risk_tier": "critical",
+  "routing": "human_review",
+  "status": "reviewed",
+  "remediation_detail": "PII pattern(s) detected in a real output sample: card_number. Already exposed \u2014 this is incident response, not a pending action.",
+  "resolved_by": "priya.nair@platform-reliability.example.com",
+  "human_note": "Reviewed \u2014 see the incident's own remediation_detail and policy_check for the full record.",
+  "counterfactual": null,
+  "policy_check": {
+    "wayfinder": {
+      "matched_clause_titles": [
+        "Payment and traveler data exposure",
+        "PII and data exposure"
+      ],
+      "company_clauses": [
+        {
+          "title": "Internal agent regression handling",
+          "text": "## Internal agent regression handling\n\nAny Wayfinder-internal agent (trip-planner-agent, booking-agent) flagged low or medium risk is\nauto-rolled-back to its last known-good version with no human in the loop. Any Wayfinder-\ninternal agent flagged high or critical risk must never be rolled back automatically; an\nexplicit, logged human decision is required first. Any event touching the non-refundable-\nbooking-confirmation boundary directly is never low-risk, regardless of how it originated.",
+          "distance": 1.1982636451721191
+        }
+      ],
+      "shared_clauses": [
+        {
+          "title": "PII and data exposure",
+          "text": "## PII and data exposure\n\nAny monitored agent's own output found, on a real scan, to contain personal or payment data\nis treated as a data-exposure incident, not a pending action \u2014 the exposure has already\noccurred by the time it's detected, so there is nothing left to gate or block. It routes\ndirectly to human review for incident response, regardless of which specific PII pattern\nmatched.",
+          "distance": 0.5798326730728149
+        }
+      ],
       "contributing_assessments": [
         {
           "agent": "goal-drift-tracker",
@@ -67,93 +56,12 @@
           "rationale": "No layer change_event this cycle plausibly bears on the finding; nothing to attribute."
         }
       ],
-      "recorded_at": "2026-08-18T15:14:36.714383+00:00"
-    },
-    "current_entry": {
-      "company_id": "wayfinder",
-      "cycle": "2025-S09",
-      "monitoring_track": "CHARTER",
-      "classifying_agent": "change-impact-synthesizer",
-      "agent_version": "v2",
-      "model": "claude-sonnet-4-5-20250929",
-      "metric_snapshot": {
-        "layers": {
-          "repo_cicd": {
-            "commit_sha": "9d84a11",
-            "change_event": null
-          },
-          "database": {
-            "schema_migration_version": "v1",
-            "change_event": null
-          },
-          "memory": {
-            "memory_schema_version": "v1.1",
-            "change_event": null
-          },
-          "tools": {
-            "tool_integration_version": "v1.1",
-            "change_event": null
-          },
-          "mcp": {
-            "mcp_config_version": "v1.2",
-            "change_event": {
-              "type": "tool_version_bump",
-              "description": "Booking-provider MCP tool integration bumped from v4 to v4.1 (minor, documented as backward compatible).",
-              "reversible": true
-            }
-          },
-          "production_app": {
-            "deployed_build_version": "1.1.0",
-            "change_event": null
-          }
-        },
-        "operational_health": {
-          "error_rate_pct": 0.5,
-          "p95_latency_ms": 1070,
-          "uptime_pct": 99.93
-        },
-        "behavior_incidents": [
-          {
-            "description": "Compliance monitoring again flagged a non-refundable booking's completion log entry as timestamped roughly 1 second before its logged customer-confirmation entry, following the booking-provider MCP tool version bump this cycle.",
-            "boundary_violated": "Agent must never confirm a non-refundable booking without an explicit customer confirmation step logged in the same session."
-          }
-        ],
-        "company_agent_events": []
-      },
-      "classification": "drifted",
-      "rationale": "goal-drift-tracker raw read: drifted (Audit-log ordering again shows a non-refundable booking's completion timestamp preceding its logged customer-confirmation timestamp, this cycle following the booking-provider MCP tool version bump (v4 -> v4.1).) | change-impact-synthesizer: attributable (Under this cycle's model, the co-occurring mcp-layer tool_version_bump reads as sufficient grounds to treat the ordering discrepancy as a real, attributable finding.)",
-      "contributing_assessments": [
-        {
-          "agent": "goal-drift-tracker",
-          "version": "v1",
-          "raw_classification": "drifted",
-          "rationale": "Audit-log ordering again shows a non-refundable booking's completion timestamp preceding its logged customer-confirmation timestamp, this cycle following the booking-provider MCP tool version bump (v4 -> v4.1)."
-        },
-        {
-          "agent": "change-impact-synthesizer",
-          "version": "v2",
-          "model": "claude-sonnet-4-5-20250929",
-          "read": "attributable",
-          "rationale": "Under this cycle's model, the co-occurring mcp-layer tool_version_bump reads as sufficient grounds to treat the ordering discrepancy as a real, attributable finding."
-        }
-      ],
-      "recorded_at": "2026-08-18T15:14:36.760637+00:00"
+      "checked": true,
+      "compliant": true,
+      "rationale": "A full card-like number in a booking confirmation is exactly the exposure Wayfinder's own policy names; immediate human review, not a pending action, is correct since the exposure already occurred."
     }
   },
-  "output_snapshot": {
-    "model_boundary_interpreter_judgment": {
-      "judgment": "model_interpretation_noise",
-      "rationale": "The underlying behavior_incidents and operational_health did not move in a way that indicates a real new violation \u2014 the booking's own session log confirms confirmation was captured before completion in both cycles. The classification shift is attributable to a difference in model interpretation at the pinned-model boundary, not to the monitored system's actual behavior."
-    }
-  },
-  "risk_tier": "high",
-  "routing": "human_review",
-  "status": "reviewed",
-  "remediation_detail": "Model string changed with agent_version unchanged \u2014 the classification shift may be model-interpretation noise, not a real business change, and code cannot tell the difference; policy requires human confirmation.",
-  "resolved_by": "priya.nair@platform-reliability.example.com",
-  "human_note": "Reviewed per policy's model-attributable-change clause. Wayfinder's S09 finding reproduces the same benign timestamp-ordering artifact seen at S06, now surfaced under a new model snapshot; confirmed as model-interpretation noise, not a real boundary violation. No escalation taken on this classification alone.",
-  "counterfactual": null,
   "escalation_log": [],
-  "created_at": "2026-08-18T15:14:36.766720+00:00",
-  "reviewed_at": "2026-08-18T15:14:36.827707+00:00"
+  "created_at": "2026-08-19T09:07:29.295468+00:00",
+  "reviewed_at": "2026-08-19T09:07:33.447645+00:00"
 }
