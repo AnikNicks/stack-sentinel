@@ -113,6 +113,17 @@ current 4-section UI (System / Ask / Companies / Incidents) and its real 14-inci
 | <img src="docs/screenshots/04-cascade-product-demo.jpg" width="480" alt="Cascade Pipeline Agent product demo: error-budget gauge and the blocked destructive migration"> | <img src="docs/screenshots/05-gmail-live-notifications.png" width="480" alt="Real Gmail inbox showing Stack Sentinel's live-dispatched incident and RRB-escalation emails, timestamped and in order"> |
 | *Cascade's illustrative product demo — the same blocked destructive migration from the story above, dramatized in-product.* | *`--live` isn't a claim — this is the real inbox `pulse/notifications.py` dispatched to, one email per incident, in order (see [Engineering notes](#engineering-notes-going-live)).* |
 
+| Auto-Rollback in Action | Human-Approval Gate + Policy Check |
+|:---:|:---:|
+| <img src="docs/screenshots/07-auto-rollback-version-history.jpg" width="480" alt="change-impact-synthesizer version history: active v2, by pulse-auto-rollback, after v3 regressed on 2025-04-28"> | <img src="docs/screenshots/08-incident-detail-policy-check.jpg" width="480" alt="INC-0011 full detail: a non-reversible database-layer change, routed to pending_human_approval, a compliant policy check citing the real clause, and the explicit human decision that approved it"> |
+| *A real auto-rollback, not a description of one — `change-impact-synthesizer` regressed at v3 and was reverted to v2 by `pulse-auto-rollback`, no human involved.* | *`INC-0011`: the destructive-change gate end to end — what happened, the policy-compliance-checker's real clause citation, and the human decision that let it proceed.* |
+
+<p align="center"><img src="docs/screenshots/06-extended-monitoring.jpg" width="760" alt="Extended monitoring rollups (schema compliance by company, security scan summary, human-approval quality, unexpected tool calls) and Stack Sentinel's own seven classifiers with their active versions"></p>
+
+*Population-level signals from the 8 extended-monitoring dimensions (schema compliance, PII/injection
+scans, human-approval turnaround), plus Stack Sentinel's own seven classifiers — versioned and
+rollback-protected the same way as any monitored company's agents.*
+
 ## Project architecture
 
 <p align="center"><img src="docs/screenshots/stack-sentinel-architecture.png" alt="Stack Sentinel request-to-resolution flow: a per-cycle data snapshot flows into the zero-LLM deterministic core (layer versioning, model-boundary detection, risk scoring, incidents, human approval, policy rules, PII/injection/loop/canary detection, company registry + rollback), through the orchestrator's single shared _route_finding() incident lifecycle, across the deterministic/agentic boundary into the seven single-shot subagents, through human_approval.py's destructive-action gate that structurally cannot auto-execute, out through pulse/notifications.py — the only module allowed to call real Gmail/Jira/Confluence/Slack — and finally into two read-only UI consumers, the operator console and the company demo apps" width="820"></p>
