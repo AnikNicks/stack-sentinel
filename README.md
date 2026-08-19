@@ -94,21 +94,22 @@ real story:
 | Wayfinder AI — "Wayfinder Copilot" | CHARTER | Agent behavior boundaries (non-refundable-booking confirmation) | Same prompt version, different underlying model snapshot, one cycle apart — a genuine **model-boundary event**, unconditionally routed to human review (`INC-0013`). A real card-like number surfaces in a booking confirmation, flagged as a **PII exposure** (`INC-0006`) |
 | Cascade Analytics — "Cascade Pipeline Agent" | SLO | Monthly error-budget consumption | Two consecutive warning-threshold cycles trip the RRB reporting clause (real dispatch); a proposed non-reversible schema drop is flagged and **blocked pending human approval** (`INC-0011`), later explicitly approved. A schema-inference summary is caught **fabricating** a field its own retrieved source never defines (`INC-0014`, `groundedness-checker`) |
 
-![Console overview — three companies, real classifications](docs/screenshots/01-overview.jpg)
+### Screenshots
 
-Every incident is real, on disk, reproducible from the exact recorded inputs:
+Every screenshot below is of the actual live static preview (`stack-sentinel.io`) or the actual
+company demo app — not a mockup, and not the stale early-build UI a README image can quietly
+drift into: these were re-captured this session against the current 4-section console (System /
+Ask / Companies / Incidents) and its real 14-incident dataset.
 
-<table>
-<tr>
-<td><img src="docs/screenshots/02-incidents.jpg" alt="Incidents queue with real routing and status"></td>
-<td><img src="docs/screenshots/03-company-detail.jpg" alt="Full per-cycle trend detail for one company"></td>
-</tr>
-</table>
+| System Overview | Companies Detail |
+|:---:|:---:|
+| <img src="docs/screenshots/01-overview.jpg" width="480" alt="Portfolio snapshot: 3 companies monitored, 1 open incident, 2 auto-resolved, 14 total, with per-company trend sparklines"> | <img src="docs/screenshots/03-company-detail.jpg" width="480" alt="Meridian Labs: charter boundaries, internal agents with real rollback status, and policy clauses"> |
+| *Portfolio-wide snapshot — live incident counts and a 6-cycle trend sparkline per company.* | *One company's full detail: charter boundaries, internal agents (note `intake-triage-agent`'s real `rolled back` status), and policy.* |
 
-Each monitored company has its own illustrative product demo — Cascade's shows the real
-error-budget gauge and the blocked destructive migration:
-
-![Cascade Pipeline Agent product demo](docs/screenshots/04-cascade-product-demo.jpg)
+| Incidents Queue | Company Product Demo |
+|:---:|:---:|
+| <img src="docs/screenshots/02-incidents.jpg" width="480" alt="All 14 real incidents across every finding kind, risk tier, routing decision, and status"> | <img src="docs/screenshots/04-cascade-product-demo.jpg" width="480" alt="Cascade Pipeline Agent product demo: error-budget gauge and the blocked destructive migration"> |
+| *All 14 incidents on record — every finding kind, risk tier, routing decision, and status, in one table.* | *Cascade's illustrative product demo — the same blocked destructive migration from the story above, dramatized in-product.* |
 
 ## Project architecture
 
