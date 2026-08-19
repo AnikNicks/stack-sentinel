@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, AGENTS } from "./api";
+import { api, AGENTS, STATIC_MODE } from "./api";
 import "./App.css";
 
 const SECTIONS = [
@@ -11,6 +11,14 @@ const SECTIONS = [
 
 const RISK_COLOR_CLASS = { critical: "bar-fill-bad", high: "bar-fill-warn", medium: "bar-fill-accent", low: "bar-fill-accent" };
 const OPEN_STATUSES = new Set(["pending_review", "pending_human_approval"]);
+
+// This company's own product demo app (companies/*), published as a separate static GitHub
+// Pages site — read-only, never feeds data back into this monitoring pipeline (see CLAUDE.md).
+const COMPANY_DEMO_URLS = {
+  meridian: "https://aniknicks.github.io/meridian-labs/",
+  wayfinder: "https://aniknicks.github.io/wayfinder-ai/",
+  cascade: "https://aniknicks.github.io/cascade-analytics/",
+};
 
 function useAsync(fn, deps) {
   const [state, setState] = useState({ loading: true, error: null, data: null });
@@ -728,6 +736,16 @@ function CompanyBlock({ company, incidents, onSelectCycle, agentsRefreshKey, onV
       <div className="company-block-header">
         <h3>{company.name}</h3>
         <span className="track-pill">{company.monitoring_track}</span>
+        {COMPANY_DEMO_URLS[company.company_id] && (
+          <a
+            className="company-demo-link"
+            href={COMPANY_DEMO_URLS[company.company_id]}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View live demo ↗
+          </a>
+        )}
       </div>
       <p className="muted">{company.sector}</p>
 
@@ -1123,6 +1141,13 @@ export default function App() {
         <p className="subtitle">Multi-agent AI software monitoring — live operator console</p>
       </header>
 
+      {STATIC_MODE && (
+        <div className="static-preview-banner">
+          Read-only preview of one real simulation run — Approve/Reject and Ask are disabled
+          here. Clone the repo and run the live console locally to use them.
+        </div>
+      )}
+
       <nav className="section-nav">
         {SECTIONS.map((s) => (
           <a key={s.id} href={`#${s.id}`} className={active === s.id ? "nav-link nav-link-active" : "nav-link"}>
@@ -1147,7 +1172,11 @@ export default function App() {
         />
       </main>
 
-      <footer className="app-footer">Stack Sentinel — local-only operator console.</footer>
+      <footer className="app-footer">
+        {STATIC_MODE
+          ? "Stack Sentinel — static preview. Full source: github.com/AnikNicks/stack-sentinel"
+          : "Stack Sentinel — local-only operator console."}
+      </footer>
     </div>
   );
 }

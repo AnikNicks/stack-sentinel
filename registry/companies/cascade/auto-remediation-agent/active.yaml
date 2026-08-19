@@ -2,5 +2,5 @@ company_id: cascade
 agent: auto-remediation-agent
 active_version: v1
 activated_by: dana.kwon@platform-reliability.example.com
-activated_at: '2026-08-19T09:07:33.412221+00:00'
+activated_at: '2026-08-19T10:55:28.602074+00:00'
 reason: Human-approved rollback following INC-0005.

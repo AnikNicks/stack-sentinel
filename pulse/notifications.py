@@ -52,7 +52,10 @@ EMAIL_ADDRESS = os.environ.get("PULSE_EMAIL_ADDRESS", "claudecodenotification@gm
 SLACK_CHANNEL_ID = os.environ.get("PULSE_SLACK_CHANNEL_ID", "")
 JIRA_PROJECT_KEY = os.environ.get("PULSE_JIRA_PROJECT_KEY", "")
 CONFLUENCE_SPACE_KEY = os.environ.get("PULSE_CONFLUENCE_SPACE_KEY", "")
+ATLASSIAN_CLOUD_ID = os.environ.get("PULSE_ATLASSIAN_CLOUD_ID", "")
 DOCKER_MCP_PROFILE = os.environ.get("PULSE_DOCKER_MCP_PROFILE", "stack-sentinel")
+
+_CONFLUENCE_SPACE_ID_CACHE: dict[str, str] = {}
 
 _LIVE = False
 
@@ -115,6 +118,24 @@ def _call_gateway_tool_sync(tool_name: str, arguments: dict[str, Any]) -> dict[s
     return asyncio.run(_call_gateway_tool(tool_name, arguments))
 
 
+def _resolve_confluence_space_id(space_key: str) -> str:
+    """The real Atlassian remote MCP's createConfluencePage takes a numeric space ID, not the
+    human-readable key configured in PULSE_CONFLUENCE_SPACE_KEY. Resolved once via
+    getConfluenceSpaces and cached — the ID is stable for a given space."""
+    if space_key in _CONFLUENCE_SPACE_ID_CACHE:
+        return _CONFLUENCE_SPACE_ID_CACHE[space_key]
+    result = _call_gateway_tool_sync("getConfluenceSpaces", {"cloudId": ATLASSIAN_CLOUD_ID, "keys": [space_key]})
+    if result.get("is_error"):
+        raise NotificationConfigError(f"could not resolve Confluence space '{space_key}': {result.get('content')}")
+    payload = json.loads(result["content"][0])
+    results = payload.get("results") or []
+    if not results:
+        raise NotificationConfigError(f"Confluence space '{space_key}' not found for cloudId {ATLASSIAN_CLOUD_ID}")
+    space_id = results[0]["id"]
+    _CONFLUENCE_SPACE_ID_CACHE[space_key] = space_id
+    return space_id
+
+
 def _record(*, channel: str, target: str, purpose: str, detail: dict[str, Any],
             incident_id: str | None = None) -> dict[str, Any]:
     status = "dry_run"
@@ -132,15 +153,21 @@ def _record(*, channel: str, target: str, purpose: str, detail: dict[str, Any],
             elif channel == "jira":
                 if not target:
                     raise NotificationConfigError("PULSE_JIRA_PROJECT_KEY is not set — cannot create live Jira ticket")
-                result = _call_gateway_tool_sync("jira_create_issue", {
-                    "issue_type": "Task", "project_key": target,
+                if not ATLASSIAN_CLOUD_ID:
+                    raise NotificationConfigError("PULSE_ATLASSIAN_CLOUD_ID is not set — cannot create live Jira ticket")
+                result = _call_gateway_tool_sync("createJiraIssue", {
+                    "cloudId": ATLASSIAN_CLOUD_ID, "projectKey": target, "issueTypeName": "Task",
                     "summary": detail["summary"], "description": detail.get("description", ""),
                 })
             elif channel == "confluence":
                 if not target:
                     raise NotificationConfigError("PULSE_CONFLUENCE_SPACE_KEY is not set — cannot create live Confluence page")
-                result = _call_gateway_tool_sync("confluence_create_page", {
-                    "space_key": target, "title": detail["title"], "content": detail["content"],
+                if not ATLASSIAN_CLOUD_ID:
+                    raise NotificationConfigError("PULSE_ATLASSIAN_CLOUD_ID is not set — cannot create live Confluence page")
+                space_id = _resolve_confluence_space_id(target)
+                result = _call_gateway_tool_sync("createConfluencePage", {
+                    "cloudId": ATLASSIAN_CLOUD_ID, "spaceId": space_id,
+                    "title": detail["title"], "body": detail["content"],
                 })
             else:
                 raise ValueError(f"unknown channel {channel}")

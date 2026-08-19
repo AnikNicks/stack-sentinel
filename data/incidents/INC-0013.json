@@ -72,7 +72,7 @@
           "rationale": "No layer change_event this cycle plausibly bears on the finding; nothing to attribute."
         }
       ],
-      "recorded_at": "2026-08-19T09:07:31.802073+00:00"
+      "recorded_at": "2026-08-19T10:55:26.836188+00:00"
     },
     "current_entry": {
       "company_id": "wayfinder",
@@ -147,7 +147,7 @@
           "rationale": "Under this cycle's model, the co-occurring mcp-layer tool_version_bump reads as sufficient grounds to treat the ordering discrepancy as a real, attributable finding."
         }
       ],
-      "recorded_at": "2026-08-19T09:07:32.574161+00:00"
+      "recorded_at": "2026-08-19T10:55:27.674112+00:00"
     }
   },
   "output_snapshot": {
@@ -203,6 +203,6 @@
     }
   },
   "escalation_log": [],
-  "created_at": "2026-08-19T09:07:32.581032+00:00",
-  "reviewed_at": "2026-08-19T09:07:33.385722+00:00"
+  "created_at": "2026-08-19T10:55:27.683305+00:00",
+  "reviewed_at": "2026-08-19T10:55:28.578830+00:00"
 }

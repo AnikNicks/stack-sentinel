@@ -24,29 +24,23 @@ jobs:
         with:
           node-version: "20"
 
-      # Only the 3 static company demo apps are Pages-deployable — dashboard/api is a real
-      # FastAPI backend and can't be hosted on static Pages, so the live console is not part
-      # of this workflow. Deploying any of this is an explicit, later, user-approved step;
-      # this workflow just keeps the build itself honest and not broken.
-      - name: Build the company demo apps
+      # dashboard/api is a real FastAPI backend with a real write action and can't be hosted
+      # on static Pages, so the LIVE console is not part of this workflow. What IS deployed at
+      # the root is dashboard/web built in static-preview mode (VITE_STATIC_MODE=true): it
+      # reads a bundled read-only snapshot of one real simulation run instead of calling a
+      # live backend, and its api.js rejects the write/decision and live-LLM Ask calls with a
+      # clear "not available in this preview" message rather than silently no-oping. --base
+      # matches this repo's Pages subpath so the built asset URLs resolve correctly.
+      #
+      # The 3 company demo apps are NOT built here — each already has its own standalone repo
+      # and Pages site (aniknicks.github.io/<company>/, correctly base-pathed there); the
+      # dashboard's Companies tab links out to them directly (see COMPANY_DEMO_URLS in
+      # dashboard/web/src/App.jsx) rather than this workflow deploying a second, redundant copy.
+      - name: Build the dashboard (static preview)
         run: |
           mkdir -p _site
-          cat > _site/index.html <<'EOF'
-          <!doctype html><html><body>
-          <h1>Stack Sentinel — company demos</h1>
-          <ul>
-            <li><a href="meridian-labs/">Meridian Concierge</a></li>
-            <li><a href="wayfinder-ai/">Wayfinder Copilot</a></li>
-            <li><a href="cascade-analytics/">Cascade Pipeline Agent</a></li>
-          </ul>
-          </body></html>
-          EOF
-          for d in companies/*/; do
-            name=$(basename "$d")
-            (cd "$d" && npm install && npm run build)
-            mkdir -p "_site/$name"
-            cp -r "$d/dist/." "_site/$name/"
-          done
+          (cd dashboard/web && npm install && VITE_STATIC_MODE=true npm run build -- --base=/stack-sentinel/)
+          cp -r dashboard/web/dist/. _site/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

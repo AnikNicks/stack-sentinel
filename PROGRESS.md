@@ -6,16 +6,22 @@ file alone and know what's built, what's tested, what's left, and where.
 
 ## Status
 
-**Build complete, local-only, through three real build waves.** The original 6-phase domain
+**Build complete and now live**, through four real build waves. The original 6-phase domain
 pivot, a follow-on company-agent-versioning + risk-tiered-rollback subsystem (with a
-company-wise dashboard reorg), and a Phase 7 extended-monitoring build (8 new deterministic
-finding kinds + 1 new agent) are all real, all verified for real, against the actual repo —
-not narrated. This project started as `portfolio-pulse`, a PE/private-debt financial
-monitoring demo; this build is a full domain pivot to multi-agent AI software monitoring,
-seeded by copying that repo's files (never modifying the original — it's a separate,
-already-published project) into this one and transforming them. `--live` notification
-delivery, a GitHub remote/Pages republish, and a literal separate git repo per company are all
-explicitly deferred, later, user-approved steps — none of them have happened in this build.
+company-wise dashboard reorg), a Phase 7 extended-monitoring build (8 new deterministic
+finding kinds + 1 new agent), and a live-readiness wave (real `--live` dispatch, GitHub remote +
+Pages, per-company repos, a static dashboard preview) are all real, all verified for real,
+against the actual repo — not narrated. This project started as `portfolio-pulse`, a
+PE/private-debt financial monitoring demo; this build is a full domain pivot to multi-agent AI
+software monitoring, seeded by copying that repo's files (never modifying the original — it's
+a separate, already-published project) into this one and transforming them.
+
+**Live and deployed:** `AnikNicks/stack-sentinel` (main repo, CI green) plus three standalone
+per-company repos (`meridian-labs`, `wayfinder-ai`, `cascade-analytics`), all four with their
+own GitHub Pages site. `--live` notification dispatch is real and verified working end-to-end
+(email, Slack, Jira, Confluence — see "Live-readiness wave" below for the real bug found and
+fixed to get Jira/Confluence working). `stack-sentinel.io`'s root now serves a static read-only
+preview of the live operator console itself, not just a link page.
 
 ## Done
 
@@ -141,13 +147,48 @@ explicitly deferred, later, user-approved steps — none of them have happened i
   the Companies detail AND the Incidents table to that company, with a company filter dropdown
   added to Incidents directly; every System-section visualization gained a purpose-caption
   subheading, matching the section-level description pattern.
+- **Live-readiness wave:** the three previously-deferred steps all happened for real. GitHub
+  remote + Pages: `AnikNicks/stack-sentinel` pushed with full history (CI green), plus three
+  separate standalone repos (`meridian-labs`, `wayfinder-ai`, `cascade-analytics`) each with
+  clean fresh history and their own Pages site. `--live` notifications: the Docker MCP
+  `notifications` profile (Gmail + Atlassian + Slack) required real user action (Slack
+  `team_id` config, Atlassian OAuth authorization) that only the user could do — once done,
+  a `--live` run surfaced a **real bug**: `pulse/notifications.py` called nonexistent tool
+  names (`jira_create_issue`/`confluence_create_page`) with wrong parameter names against the
+  real Atlassian remote MCP server, which actually exposes `createJiraIssue`/
+  `createConfluencePage` and requires a `cloudId` (not previously configured anywhere) plus a
+  numeric Confluence `spaceId` (not the human-readable space key). Fixed: correct tool names
+  and parameter names, new `PULSE_ATLASSIAN_CLOUD_ID` env var, and a cached
+  `_resolve_confluence_space_id()` lookup so the human-readable `PULSE_CONFLUENCE_SPACE_KEY`
+  still works as the operator-facing config surface. Verified with a real `--reset --live` run:
+  34/34 dispatches sent (15 email, 14 Slack, 1 Jira, 4 Confluence), zero errors.
+  **Dashboard preview:** `dashboard/web/src/api.js` gained a static-mode shim
+  (`VITE_STATIC_MODE=true`) that reads a bundled read-only snapshot
+  (`scripts/export_dashboard_snapshot.py` → `dashboard/web/src/fixtures/dashboard_snapshot.json`,
+  committed like the company apps' fixtures) instead of calling the live FastAPI backend, which
+  can't run on static Pages. The write action (`recordDecision`) and the live-LLM `ask` call
+  reject with a clear "not available in this preview" message the existing error-banner UI
+  already renders — no new UI needed for that. `deploy-pages.yml` now builds this static
+  preview at the repo's Pages root (`--base=/stack-sentinel/`) instead of a plain link-list
+  page, and no longer also builds redundant nested copies of the 3 company apps (they already
+  have their own correctly base-pathed standalone Pages sites — a **real bug**, since the old
+  workflow built them with no `--base` at all, which would have collided with the dashboard's
+  own root-relative asset paths). The dashboard's Companies tab now links out to each company's
+  live demo site directly (`COMPANY_DEMO_URLS` in `App.jsx`).
+- **Audit-log torn-write discovered and worked around:** concurrent processes during this same
+  testing wave (a live simulation run overlapping with manual Atlassian-schema exploration
+  scripts) produced one interleaved/corrupted line in `data/audit_log.jsonl`, breaking
+  `pulse/metrics.system_health_summary()`. Not hand-patched — regenerated deterministically via
+  `simulate_production_run.py --reset` (without `--live`, so it didn't re-fire real
+  notifications a third time), which reproduced the identical 14 incidents, confirming the
+  corruption was a testing-session artifact, not a logic bug.
 
 ## In progress
 
-Nothing — all work requested so far is complete and verified. Remaining work is entirely the
-explicitly-deferred, later, user-approved steps: `--live` notification credentials, GitHub
-remote + Pages republish, and (if actually wanted, not yet confirmed) literal separate git
-repos per company.
+Nothing — all work requested so far, including the previously-deferred live-readiness steps, is
+complete and verified. The one remaining explicitly-deferred, later, user-approved step is
+hosting `dashboard/api` (the real FastAPI backend) somewhere public for a fully live console —
+declined in favor of the static read-only preview; see "Live-readiness wave" above.
 
 ## Key decisions
 
@@ -209,3 +250,16 @@ real-numbers report this section summarizes):
   separately browser-verified (Cascade's verification exercised the shared component pattern
   all three apps use). All three apps' fixtures regenerated after Phase 7 and confirmed to
   carry the new cost/context/escalation/`security_quality_events` fields.
+- **Live-readiness wave**, verified for real, not narrated: `python
+  scripts/simulate_production_run.py --reset --live` — 34/34 real dispatches sent (15 email,
+  14 Slack, 1 Jira, 4 Confluence), 0 errors, after the Jira/Confluence tool-name/param fix (see
+  "Live-readiness wave" above). All 4 GitHub Pages sites confirmed live and serving correct
+  content via `curl` (`<title>` match per company, `gh run list` shows CI + Deploy Pages both
+  green on the main repo). `dashboard/web`: both `npm run build` (live mode) and
+  `VITE_STATIC_MODE=true npm run build -- --base=/stack-sentinel/` (preview mode) verified
+  clean; confirmed via grepping the built JS that the preview-only banner text is present in
+  the static bundle and absent from the live bundle (dead-code elimination working as
+  intended), and that `--base` produces correct `/stack-sentinel/assets/...` absolute paths
+  matching the already-working company-repo pattern. Not yet re-verified live in a browser
+  after this specific change — worth a quick visual check of `stack-sentinel.io` once
+  redeployed.
